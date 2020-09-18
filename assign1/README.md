@@ -67,50 +67,50 @@ Note: In all the below functions, file handling variables like curPagePos and to
 
  (5) readBlock():
   - Read block at position pageNum from file and store contents in memory pointed by memPage.
-	- Set the file pointer to position returned by fseek and read PAGE_SIZE bytes from that position.
+  - Set the file pointer to position returned by fseek and read PAGE_SIZE bytes from that position.
 
  (6) getBlockPos():
-	- Get current position in file using curPagePos from file handle
+  - Get current position in file using curPagePos from file handle
 
  (7) readFirstBlock ():
-	- Uses rewind() to set file pointer to start of file. Use fread() to read from location set.
+  - Uses rewind() to set file pointer to start of file. Use fread() to read from location set.
 
  (8) readPreviousBlock ():
- 	- Get current position (curPagePos) of file using getBlockPos()
- 	- Calculate the current page number (currPagePos) using PAGE_SIZE and curPagePos
- 	- Use fseek() to set the pointer to page previous to currPagePos.
- 	- Use fread() to read from position set by fseek() and update curPagePos value to new page number
+  - Get current position (curPagePos) of file using getBlockPos()
+  - Calculate the current page number (currPagePos) using PAGE_SIZE and curPagePos
+  - Use fseek() to set the pointer to page previous to currPagePos.
+  - Use fread() to read from position set by fseek() and update curPagePos value to new page number
 
  (9) readCurrentBlock ():
   - Get current position (curPagePos) of file using getBlockPos()
- 	- Calculate the current page number (curPageNum) using PAGE_SIZE and curPagePos
- 	- Use fseek() to set the pointer to curPageNum.
- 	- Use fread() to read from position set by fseek()
+  - Calculate the current page number (curPageNum) using PAGE_SIZE and curPagePos
+  - Use fseek() to set the pointer to curPageNum.
+  - Use fread() to read from position set by fseek()
 
  (10) readNextBlock ():
-	- Get current position (curPagePos) of file using getBlockPos()
- 	- Calculate the current page number (curPageNum) using PAGE_SIZE and curPagePos
- 	- Use fseek() to set the pointer to page next to curPageNum.
- 	- Use fread() to read from position set by fseek() and update curPagePos value to new page number
+  - Get current position (curPagePos) of file using getBlockPos()
+  - Calculate the current page number (curPageNum) using PAGE_SIZE and curPagePos
+  - Use fseek() to set the pointer to page next to curPageNum.
+  - Use fread() to read from position set by fseek() and update curPagePos value to new page number
 
  (11) readLastBlock ():
-	- Get last page number of file using totalNumPages in file handle
- 	- Use fseek() to set the pointer to last page using last page number and PAGE_SIZE
- 	- Use fread() to read from position set by fseek() and update curPagePos value to last page number
+  - Get last page number of file using totalNumPages in file handle
+  - Use fseek() to set the pointer to last page using last page number and PAGE_SIZE
+  - Use fread() to read from position set by fseek() and update curPagePos value to last page number
 
  (12) writeBlock ():
-	- Checks if a page number exists.
-	- If true, "fseek" seeks the file pointer until that page, and writes data from the page handler to the location using "fwrite".
-	- Returns the "NON-EXISTING PAGE" error if the page does not exist.
+  - Checks if a page number exists.
+  - If true, "fseek" seeks the file pointer until that page, and writes data from the page handler to the location using "fwrite".
+  - Returns the "NON-EXISTING PAGE" error if the page does not exist.
 
  (13) writeCurrentBlock ():
-	- Uses "fseek" to seek the file pointer until a page.
-	- The pointer is then incremented, and data from the page handler is written to the seeked location using fwrite.
+  - Uses "fseek" to seek the file pointer until a page.
+  - The pointer is then incremented, and data from the page handler is written to the seeked location using fwrite.
 
  (14) appendEmptyBlock ():
-	- Uses "fseek" to seek the pointer to the end, and adds a new block by calling "fputc()".
-	- Then, it increments the total number of pages available in the File Handler
+  - Uses "fseek" to seek the pointer to the end, and adds a new block by calling "fputc()".
+  - Then, it increments the total number of pages available in the File Handler
 
  (15) ensureCapacity ():
-	- Checks the capacity and the number of existing pages.
-	- If less than the capacity, runs a process like "appendEmptyBlock()" to reach the capacity
+  - Checks the capacity and the number of existing pages.
+  - If less than the capacity, runs a process like "appendEmptyBlock()" to reach the capacity
