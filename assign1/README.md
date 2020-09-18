@@ -14,7 +14,7 @@ The code base for assignment 1 includes the following files:
 6. dberror.c
 7. dberror.h
 8. Makefile
-9. README.txt text file
+9. README.md
 
 ------------------------- MAKEFILE AND SCRIPT EXECUTION -------------------------
 
