@@ -39,7 +39,23 @@ Execute any one of the below commands to run the file:
 - make run_test2
 	- It runs the "test_assign1_2.c"
 
-------------------------- storage_mgr.c -------------------------
+  ------------------------- ADDITIONAL TEST CASES INCLUDED ARE AS BELOW -------------------------
+  (1) Open a file before creation
+  (2) Destory a non-existing file
+  (3) Create a file with similar name as of existing file
+  (4) Write to current block
+  (5) Write to specific block
+  (6) Write to a non-existing file
+  (7) Read first block
+  (8) Read last block
+  (9) Read current block
+  (10) Read specific block number
+  (11) Read block after last block
+  (12) Read block before first block
+  (13) Read from non-existing file
+  ----------------------------------------------------------------------------------------------------
+
+  ------------------------------- DETAILS OF FUNCTIONS IMPLEMENTATION --------------------------------
 
 Below are the functions defined in storage_mgr.c. The interfaces are defined in the corresponding header file, storage_mgr.h
 Note: In all the below functions, file handling variables like curPagePos and totalNumOfPages etc., are kept updated whenever the file contents are modified
