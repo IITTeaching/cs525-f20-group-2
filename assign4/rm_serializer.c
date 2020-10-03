@@ -18,7 +18,7 @@ typedef struct VarString {
 			var = (VarString *) malloc(sizeof(VarString));	\
 			var->size = 0;					\
 			var->bufsize = 100;					\
-			var->buf = calloc(100,0);				\
+			var->buf = calloc(100,1);				\
 		} while (0)
 
 #define FREE_VARSTRING(var)			\
@@ -83,7 +83,7 @@ serializeTableInfo(RM_TableData *rel)
 	RETURN_STRING(result);
 }
 
-char * 
+char *
 serializeTableContent(RM_TableData *rel)
 {
 	int i;
@@ -108,7 +108,7 @@ serializeTableContent(RM_TableData *rel)
 }
 
 
-char * 
+char *
 serializeSchema(Schema *schema)
 {
 	int i;
@@ -148,7 +148,7 @@ serializeSchema(Schema *schema)
 	RETURN_STRING(result);
 }
 
-char * 
+char *
 serializeRecord(Record *record, Schema *schema)
 {
 	VarString *result;
@@ -168,7 +168,7 @@ serializeRecord(Record *record, Schema *schema)
 	RETURN_STRING(result);
 }
 
-char * 
+char *
 serializeAttr(Record *record, Schema *schema, int attrNum)
 {
 	int offset;
@@ -280,7 +280,7 @@ stringToValue(char *val)
 }
 
 
-RC 
+RC
 attrOffset (Schema *schema, int attrNum, int *result)
 {
 	int offset = 0;
