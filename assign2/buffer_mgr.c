@@ -12,7 +12,7 @@
 typedef struct pageFrame{
 
     int pageNum;            /* the page number of the node in page file*/
-    int frameNum;          /* the number of frames in the frame list*/
+    int frameNo;          /* the number of frames in the frame list*/
     int dirtyBit;           /* dirtyBit as 1, not dirtyBit as 0*/
     int fixCount;           /* fixCound of the page based on the pinning/un-pinning request*/
     char *data;             /*number of clients pinned the page */
@@ -21,7 +21,6 @@ typedef struct pageFrame{
 
 }pageFrame;
 
-/* A frame list with a pointer to head and tail node of tyoe pageFrame.*/
 typedef struct fList{
 
     pageFrame *head;    /* will add new or updated or recently used node to head*/
@@ -32,16 +31,16 @@ typedef struct fList{
 /* the data available per buffer pool added to mgmtData*/
 typedef struct bpInfo{
 
-    int numframelist;           /* no.of frames used in frame list */
+    int totalFrames;           /* no.of frames used in frame list */
     int numReads;            /* no.of reads*/
     int numWrites;           /* no.of writes*/
     int countPinned;      /* count total pinned pages */
     void *startData;
-    int pagesToFrames[MAX_PAGES];         /* an array from pageNumber to frameNumber.*/
-    int framesToPages[MAX_FRAMES];        /* an array from frameNumber to pageNumber.*/
+    int pagesToFramesNo[MAX_PAGES];         /* an array from pageNumber to frameNumber.*/
+    int framesToPagesNo[MAX_FRAMES];        /* an array from frameNumber to pageNumber.*/
     fList *framelist;      /* a pointer to the frame list in the buffer pool*/
-    int fixedCounts[MAX_FRAMES];
-    bool dirtyFlags[MAX_FRAMES];
+    int fixCountsArray[MAX_FRAMES];
+    bool dirtyBitsArray[MAX_FRAMES];
 
 }bpInfo;
 
@@ -53,7 +52,7 @@ pageFrame *createNewNode(){
 
     pageFrame *newnode = malloc(sizeof(pageFrame));
     newnode->pageNum = NO_PAGE;
-    newnode->frameNum = 0;
+    newnode->frameNo = 0;
     newnode->dirtyBit = 0;
     newnode->fixCount = 0;
     newnode->data =  calloc(PAGE_SIZE, sizeof(SM_PageHandle));
@@ -66,35 +65,33 @@ pageFrame *createNewNode(){
 /*------------------ Additional Methods ------------------*/
 
 
-/* To make the given node the head of the list.*/
-void changeHeadNode(fList **list, pageFrame *updateNode){
+//Update the given node to head
+void changeHeadNode(fList **list, pageFrame *updateHeadNode){
 
     pageFrame *head = (*list)->head;
 
-    if(updateNode == (*list)->head || head == NULL || updateNode == NULL){
+    if(updateHeadNode == (*list)->head || head == NULL || updateHeadNode == NULL){
         return;
     }
-    else if(updateNode == (*list)->tail){
-        pageFrame *temp = ((*list)->tail)->prev;
-        temp->next = NULL;
-        (*list)->tail = temp;
+    else if(updateHeadNode == (*list)->tail){
+        pageFrame *tnode = ((*list)->tail)->prev;
+        tnode->next = NULL;
+        (*list)->tail = tnode;
     }
     else{
-        updateNode->prev->next = updateNode->next;
-        updateNode->next->prev = updateNode->prev;
+        updateHeadNode->prev->next = updateHeadNode->next;
+        updateHeadNode->next->prev = updateHeadNode->prev;
     }
+    updateHeadNode->next = head;
+    head->prev = updateHeadNode;
+    updateHeadNode->prev = NULL;
 
-    updateNode->next = head;
-    head->prev = updateNode;
-    updateNode->prev = NULL;
-
-    (*list)->head = updateNode;
+    (*list)->head = updateHeadNode;
     (*list)->head->prev = NULL;
     return;
 }
 
-/* To find the node with given page number. It should be first checked by the lookup array,
- and if available in memory, then to find the exact node. */
+/* Find the node by page number if it is in memory */
 pageFrame *findbyPageNumber(fList *list, const PageNumber pageNum){
 
     pageFrame *currentNode = list->head;
@@ -114,16 +111,13 @@ pageFrame *pagesInMemory(BM_BufferPool *const bm, BM_PageHandle *const page,cons
     pageFrame *nodeExists;
     bpInfo *bufferpool = (bpInfo *)bm->mgmtData;
 
-    if((bufferpool->pagesToFrames)[pageNum] != NO_PAGE){
+    if((bufferpool->pagesToFramesNo)[pageNum] != NO_PAGE){
         if((nodeExists = findbyPageNumber(bufferpool->framelist, pageNum)) == NULL){
             return NULL;
         }
-
-        /* provide the client with the data and details of page*/
+        //data is given to the client and fixcount is updated because it is pinned
         page->pageNum = pageNum;
         page->data = nodeExists->data;
-
-        /* pinned, so increase the fix count and the read-count*/
         nodeExists->fixCount++;
 
         return nodeExists;
@@ -140,8 +134,6 @@ RC updateFrames(BM_BufferPool *const bm, pageFrame *nodeExists, BM_PageHandle *c
     if ((flag = openPageFile ((char *)(bm->pageFile), &fh)) != RC_OK){
         return flag;
     }
-
-    /* If the frame to be replaced is dirty, write it back to the disk.*/
     if(nodeExists->dirtyBit == 1){
 
         if((flag = writeBlock(nodeExists->pageNum,&fh, nodeExists->data)) != RC_OK){
@@ -149,12 +141,9 @@ RC updateFrames(BM_BufferPool *const bm, pageFrame *nodeExists, BM_PageHandle *c
         }
         (bufferpool->numWrites)++;
     }
+    (bufferpool->pagesToFramesNo)[nodeExists->pageNum] = NO_PAGE;
 
-    /* Update the pagesToFrames lookup, set the replaceable page's value to NO_PAGE.*/
-    (bufferpool->pagesToFrames)[nodeExists->pageNum] = NO_PAGE;
-
-    /* Read the data into new frame.*/
-
+    //read the pagenum from the file to data field
     if((flag = readBlock(pageNum, &fh, nodeExists->data)) != RC_OK){
         return flag;
     }
@@ -162,17 +151,14 @@ RC updateFrames(BM_BufferPool *const bm, pageFrame *nodeExists, BM_PageHandle *c
     /* provide the client with the data and details of page*/
     page->pageNum = pageNum;
     page->data = nodeExists->data;
-
     (bufferpool->numReads)++;
 
-    /* Set all the parameters of the new frame, and update the lookup arrays.*/
+    //give the data to client and update the details
     nodeExists->dirtyBit = 0;
     nodeExists->fixCount = 1;
     nodeExists->pageNum = pageNum;
-
-
-    (bufferpool->pagesToFrames)[nodeExists->pageNum] = nodeExists->frameNum;
-    (bufferpool->framesToPages)[nodeExists->frameNum] = nodeExists->pageNum;
+    (bufferpool->pagesToFramesNo)[nodeExists->pageNum] = nodeExists->frameNo;
+    (bufferpool->framesToPagesNo)[nodeExists->frameNo] = nodeExists->pageNum;
 
     closePageFile(&fh);
 
@@ -194,17 +180,17 @@ RC pinPage_FIFO (BM_BufferPool *const bm, BM_PageHandle *const page,const PageNu
   // If lookup pointer failed to load page from memory
 
     // if there is space available to insert new page in frame, then add page to first free frame.
-    if((bufferpool->numframelist) < bm->numPages){
+    if((bufferpool->totalFrames) < bm->numPages){
         lookUp = bufferpool->framelist->head;
         int i = 0;
 
-        while(i < bufferpool->numframelist){
+        while(i < bufferpool->totalFrames){
             lookUp = lookUp->next;
             ++i;
         }
 
         //After adding page to frame, increase frame size by 1.
-        (bufferpool->numframelist)++;
+        (bufferpool->totalFrames)++;
         changeHeadNode(&(bufferpool->framelist), lookUp);
     }
     else{
@@ -236,50 +222,43 @@ RC pinPage_LRU (BM_BufferPool *const bm, BM_PageHandle *const page,const PageNum
 {
     pageFrame *nodeExists;
     bpInfo *bufferpool = (bpInfo *)bm->mgmtData;
+    RC flag;
 
-  /* The pagesToFrame array is used to lookup if pages are already there in memory.*/
+  // The pagesToFrame array is used to lookup if pages are already there in memory.
     if((nodeExists = pagesInMemory(bm, page, pageNum)) != NULL){
-        /* if available detach the node and update it to the head, as now it is the latest frame. */
+      // if available detach the node and update it to the head, as of now it is the latest frame.
         changeHeadNode(&(bufferpool->framelist), nodeExists);
         return RC_OK;
     }
-
-      /* If there is free space for frame is available in memory lookup for that space from head. */
-    if((bufferpool->numframelist) < bm->numPages){
+    // If there is free space for frame is available in memory lookup for that space from head.
+    if((bufferpool->totalFrames) < bm->numPages){
         nodeExists = bufferpool->framelist->head;
-
-        int i = 0;
-        while(i < bufferpool->numframelist){
+        int i;
+        for(i=0; i < bufferpool->totalFrames; ++i){
             nodeExists = nodeExists->next;
-            ++i;
         }
-        /*Now the available space is filled so increase the num of frames count*/
-        (bufferpool->numframelist)++;
+        //Now the available space is filled so increase the num of frames count
+        (bufferpool->totalFrames)++;
     }
     else{
-        /* if there is no free space find the frame with fix count 0 from the tail*/
+        // if there is no free space find the frame with fix count 0 from the tail
         nodeExists = bufferpool->framelist->tail;
-
         while(nodeExists != NULL && nodeExists->fixCount != 0){
             nodeExists = nodeExists->prev;
         }
-
-          /* if the pointer reaches the head there is no node frames with fix count 0, that is some clients are using every frames, so no space*/
+        // if the pointer reaches the head there is no node frames with fix count 0, that is some clients are using every frames, so no space
         if (nodeExists == NULL){
             return RC_NO_MORE_SPACE_IN_BUFFER;
         }
     }
 
-    RC flag;
-
     if((flag = updateFrames(bm, nodeExists, page, pageNum)) != RC_OK){
         return flag;
     }
-
     changeHeadNode(&(bufferpool->framelist), nodeExists);
-
     return RC_OK;
 }
+
 RC pinPage_CLOCK (BM_BufferPool *const bm, BM_PageHandle *const page,const PageNumber pageNum)
 {
 		RC result;
@@ -387,42 +366,35 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
                   const int numPages, ReplacementStrategy strategy,
                   void *startData)
 {
-    int i;
+    int i = 1;
     SM_FileHandle fh;
 
-    if(numPages <= 0){
-        return RC_INVALID_BM;
-    }
+    if(numPages <= 0){  return RC_INVALID_BM; }
 
     if (openPageFile ((char *)pageFileName, &fh) != RC_OK){
         return RC_FILE_NOT_FOUND;
     }
 
-
     bpInfo *bufferpool = malloc(sizeof(bpInfo));
 
-    bufferpool->numframelist = 0;
+    bufferpool->totalFrames = 0;
     bufferpool->numReads = 0;
     bufferpool->numWrites = 0;
     bufferpool->startData = startData;
     bufferpool->countPinned = 0;
-
-
-    memset(bufferpool->framesToPages,NO_PAGE,MAX_FRAMES*sizeof(int));
-    memset(bufferpool->pagesToFrames,NO_PAGE,MAX_PAGES*sizeof(int));
-    memset(bufferpool->dirtyFlags,NO_PAGE,MAX_FRAMES*sizeof(bool));
-    memset(bufferpool->fixedCounts,NO_PAGE,MAX_FRAMES*sizeof(int));
-
+    memset(bufferpool->framesToPagesNo,NO_PAGE,MAX_FRAMES*sizeof(int));
+    memset(bufferpool->pagesToFramesNo,NO_PAGE,MAX_PAGES*sizeof(int));
+    memset(bufferpool->dirtyBitsArray,NO_PAGE,MAX_FRAMES*sizeof(bool));
+    memset(bufferpool->fixCountsArray,NO_PAGE,MAX_FRAMES*sizeof(int));
 
     bufferpool->framelist = malloc(sizeof(fList));
-
     bufferpool->framelist->head = bufferpool->framelist->tail = createNewNode();
-
-    for(i = 1; i<numPages; ++i){
+    while(i<numPages){
         bufferpool->framelist->tail->next = createNewNode();
         bufferpool->framelist->tail->next->prev = bufferpool->framelist->tail;
         bufferpool->framelist->tail = bufferpool->framelist->tail->next;
-        bufferpool->framelist->tail->frameNum = i;
+        bufferpool->framelist->tail->frameNo = i;
+        ++i;
     }
 
     bm->numPages = numPages;
@@ -437,10 +409,8 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
 
 RC shutdownBufferPool(BM_BufferPool *const bm)
 {
-    if (!bm || bm->numPages <= 0){
-        return RC_INVALID_BM;
-    }
     RC flag;
+    if (!bm || bm->numPages <= 0){    return RC_INVALID_BM;  }
 
     if((flag = forceFlushPool(bm)) != RC_OK){
         return flag;
@@ -455,28 +425,21 @@ RC shutdownBufferPool(BM_BufferPool *const bm)
         free(bufferpool->framelist->head);
         bufferpool->framelist->head = currentNode;
     }
-
     bufferpool->framelist->head = bufferpool->framelist->tail = NULL;
     free(bufferpool->framelist);
     free(bufferpool);
-
     bm->numPages = 0;
     firstTimeIndicator = 0;
-
-
     return RC_OK;
 }
 
 RC forceFlushPool(BM_BufferPool *const bm)
 {
-    if (!bm || bm->numPages <= 0){
-        return RC_INVALID_BM;
-    }
+    SM_FileHandle fh;
+    if (!bm || bm->numPages <= 0){  return RC_INVALID_BM; }
 
     bpInfo *bufferpool = (bpInfo *)bm->mgmtData;
     pageFrame *currentNode = bufferpool->framelist->head;
-
-    SM_FileHandle fh;
 
     if (openPageFile ((char *)(bm->pageFile), &fh) != RC_OK){
         return RC_FILE_NOT_FOUND;
@@ -609,35 +572,25 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
 
 /*------------------ Statistics Functions ------------------*/
 
-
 PageNumber *getFrameContents (BM_BufferPool *const bm)
 
 {
-
 	/*
-
 	     a. Return contents of page stored at ith frame location
-
         b. Empty page to return NO_PAGE
-
 	*/
-
-
-
     	int value = bm->strategy;
     	if(value < 2){
 
-    		return ((bpInfo *)bm->mgmtData)->framesToPages;
+    		return ((bpInfo *)bm->mgmtData)->framesToPagesNo;
     	}
-
      PageNumber *pageNumbers;
   	 pageFrame *currentNode;
-      bpInfo *mgmtInfo = (bpInfo *)bm->mgmtData;
+    bpInfo *mgmtInfo = (bpInfo *)bm->mgmtData;
   	 int i, n;
 
       n = bm->numPages;
   	 currentNode = mgmtInfo->framelist->head;
-
       pageNumbers = (int *)malloc(sizeof(int)*n);
 
   	 for(currentNode, i=0; currentNode!= NULL; i++,currentNode=currentNode->next)
@@ -655,11 +608,11 @@ bool *getDirtyFlags (BM_BufferPool *const bm)
     pageFrame *currentNode = bufferpool->framelist->head;
 
     while (currentNode != NULL){
-        (bufferpool->dirtyFlags)[currentNode->frameNum] = currentNode->dirtyBit;
+        (bufferpool->dirtyBitsArray)[currentNode->frameNo] = currentNode->dirtyBit;
         currentNode = currentNode->next;
     }
 
-    return bufferpool->dirtyFlags;
+    return bufferpool->dirtyBitsArray;
 }
 
 int *getFixCounts (BM_BufferPool *const bm)
@@ -669,48 +622,30 @@ int *getFixCounts (BM_BufferPool *const bm)
     pageFrame *currentNode = bufferpool->framelist->head;
 
     while (currentNode != NULL){
-        (bufferpool->fixedCounts)[currentNode->frameNum] = currentNode->fixCount;
+        (bufferpool->fixCountsArray)[currentNode->frameNo] = currentNode->fixCount;
         currentNode = currentNode->next;
     }
 
-    return bufferpool->fixedCounts;
+    return bufferpool->fixCountsArray;
 }
 
 
 int getNumReadIO (BM_BufferPool *const bm)
 
 {
-
 	/*
-
 	     a. Should return number of pages read from disk since initialization of pool
-
         b. We should note down number and time of update whenever a page is moved to frame from disk
-
         c. Return 0 in case of no data
-
 	*/
-
 	return (((bpInfo *)bm->mgmtData) != NULL) ? ((bpInfo *)bm->mgmtData)->numReads : 0;
-
 }
-
-
 
 int getNumWriteIO (BM_BufferPool *const bm)
-
 {
-
 	/*
-
 			a. Should return number of pages written to page file since pool is initialized
-
 			b. Return 0 in case of no data
-
 	*/
-
 	return (((bpInfo *)bm->mgmtData) != NULL) ? ((bpInfo *)bm->mgmtData)->numWrites : 0;
-
-
 }
-
