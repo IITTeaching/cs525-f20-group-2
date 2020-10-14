@@ -1,49 +1,48 @@
 CS 525 - Fall 2020 - Assignment 2 - Buffer Manager
 
-Anjali Sundardas Veer - (A20468954, aveer@hawk.iit.edu)
-Deekshana Veluchamy - (A20474290, dveluchamy@hawk.iit.edu)
-Vaishnavi Manjunath - (A20446043, vmanjunath@hawk.iit.edu)
+Anjali Veer - (aveer@hawk.iit.edu)
+Deekshana Veluchamy - (dveluchamy@hawk.iit.edu)
+Vaishnavi Manjunath - (vmanjunath@hawk.iit.edu)
 
 ------------------------- FILES INCLUDED IN THE ASSIGNMENT -------------------------
+The code base for assignment 2 includes the following files:
 
-The code base for assignment 1 includes the following files:
-
-1. storage_mgr.c
-2. storage_mgr.h
-3. test_assign1_1.c
-4. test_assign1_2.c
-5. test_helper.h
-6. dberror.c
-7. dberror.h
-8. Makefile
-9. README text file
-10. buffer_mgr.h
-11. buffer_mgr.c
-12. buffer_mgr_stat.h
-13. buffer_mgr_stat.c
+README.md
+Makefile
+dt.h
+test_helper.h
+storage_mgr.h
+dberror.h
+buffer_mgr.h
+buffer_mgr_stat.h
+buffer_mgr_stat.c
+dberror.c
+buffer_mgr.c
+storage_mgr.c
+test_assign2_1.c - Included testing details for FIFO and LRU page replacement strategy
+test_assign2_2.c - Included testing details for CLOCK page replacement strategy
 
 ------------------------- MAKEFILE AND SCRIPT EXECUTION -------------------------
 
 Execute any one of the below commands to run the file:
 
 cd - Go to Project root (assign2) directory
-
 ls - To list all the files and check that we are in the correct directory
-
 make clean - To delete the generated/compiled .o (output) files
-
 make all - It compiles both test_assign2_1.c and test_assign2_2.c and its dependency files
+make run_test1 - It executes test_assign2_1. Output of execution will be redirected to output_test1 file.
+					     This file output_test1 can be checked for output
+make run_test2 - It executes test_assign2_2. Output of execution will be redirected to output_test2 file.
+					     This file output_test2 can be checked for output
 
-make run_test1 - It runs the "test_assign2_1.c"
+------------------------ ADDITIONAL IMPLEMENTATION INCLUDES ---------------------------
+CLOCK page replacement strategy and its testing.
 
-make run_test2 - It runs the "test_assign2_2.c"
+------------------- DETAILS OF GENERIC FUNCTIONS IMPLEMENTATION -----------------------
+Below are the functions defined in buffer_mgr.c.
+The interfaces are defined in the corresponding header file, buffer_mgr.h 
 
-
-------------------- DETAILS OF FUNCTIONS IMPLEMENTATION -----------------------
-
-***************************buffer_mgr.c************************************
-
--- Functions for Buffer Pool --
+----------------------  Functions for Buffer Pool --------------------------
 These functions create a buffer pool for a file on the disk. The storage manager from the first assignment will be used for managing page files.
 
 initBufferPool()
@@ -58,7 +57,7 @@ forceFlushPool()
  - In such situation this function is called to make sure those respective nodes are saved back to the file before any other functionality can take place.
  - This is required to make sure we do not loose the latest updated data.
 
--- Functions for Page Management --
+--------------------  Functions for Page Management -----------------------
 These functions load/remove pages from the buffer pool, marks pages as dirty, and forces a page to be written to the disk
 
 pinPage()
@@ -74,44 +73,48 @@ makeDirty()
 forcePage()
  - This function basically writes a page back to the file. Even if it is dirty it will forcibly make it save to the file and make the necessary changes to the parameters.
 
--- Functions for Statistics --
-These functions gathers statistical info about the buffer pool.
-
-getFrameContents()
- - Return the list of all the contents of the pages stored in the buffer pool.
-
-getDirtyFlags()
- - Return the list of all the dirty pages stored in the buffer pool.
-
-getFixCounts()
-- Return the fix count of all the pages stored in the buffer pool.
-
-getNumReadIO ();
+-------------------- Functions for Statistics -----------------------
+1. getFrameContents ():
+	- This function returns page numbers of all pages stored in buffer.
+	- It starts accessing linked list from head until tail.
+	- While accessing each node, value of pageNumber associated with node is stored in array of page numbers.
+	- After reading all pages, this array of page numbers is returned as output.
+	
+2. getDirtyFlags ();
+	- This function returns dirty bits of all pages stored in buffer.
+	- It starts accessing linked list from head until tail.
+	- While accessing each node, value of dirtyBit associated with node is stored in boolean array.
+	- After reading all pages, this array of page numbers is returned as output.
+	
+3. getFixCounts ();
+	- This function returns fix counts of all pages stored in buffer.
+	- It starts accessing linked list from head until tail.
+	- While accessing each node, value of fixCount associated with node is stored in an integer array.
+	- After reading all pages, this array of page numbers is returned as output.
+	
+4. getNumReadIO ();
 	- This function returns total number of pages read while accessing the pages in sequence provided.
 	- As we store number of pages read in the management info of buffer, function directly returns value of numReads variable
+	
+5. getNumWriteIO ();
+	- This function returns total number of pages written to disk while accessing the pages in sequence provided.
+	- As we store number of pages written to disk in the management info of buffer, function directly returns value of numWrites variable
 
-getNumWriteIO ();
-  - This function returns total number of pages written to disk while accessing the pages in sequence provided.
-  - As we store number of pages written to disk in the management info of buffer, function directly returns value of numWrites variable
-
--- Functions for Page repacement algorithms --
+------------------- DETAILS OF PAGE REPLACEMENT STRATEGY FUNCTIONS IMPLEMENTATION -----------------------
 3 page replacement strategies are implemented: FIFO, LRU, and CLOCK. These are used to determine which pages have to be removed when no free space is available on the buffer pool
 
-FIFO()
+1. pinPage_FIFO()
  - Check the page availability in memory
  - If there is space available to insert new page in frame, then add page to first free frame. After adding page to frame, increase frame size by 1.
  - If all the frames are filled out, replace frame which comes first in memory as per FIFO strategy and update new page to frame
 
-LRU()
+2. pinPage_LRU()
  - Check the page availability in memory
  - When the frame is referenced everytime it is moved to the head of the list. So head will be the latest frame used and tail will be the least used
  - When page is not in memory, start iterating from tail to find the node with fixcount 0
  - Then the page is updated in that frame
 
--- ADDITIONAL IMPLEMENTATION INCLUDES --
-CLOCK page replacement strategy and its testing.
-
-pinPage_CLOCK:
+3. pinPage_CLOCK()
 	- This function implements CLOCK page replacement strategy.
 	- A doubly linked list is used as data structure to store frames information.
 	- Below are the steps included in function:
@@ -124,7 +127,7 @@ pinPage_CLOCK:
 			For reading a page from file, we need to decide which page is to be replaced with new page.
 			This is decided using the fixCount associated with each page.
 			If fixCount of page is 0, we move the current node pointer to next node in list.
-			If doubly linked list reaches tail of list, we reset current node to head of list,
+			If doubly linked list reaches tail of list, we reset current node to head of list, 
 					because in CLOCK it works in circular fashion and we have to check all nodes until we find node with fixCount=0
 			If fixCount of page is 1, we replace the page.
 			If the page with fixCount = 1 has dirtyBit = 1, then it is written to file before replacing.
@@ -133,7 +136,6 @@ pinPage_CLOCK:
 		a. Number of frames used = 3
 		b. Access sequence used = 0, 4, 1, 4, 2, 4, 3, 4, 2, 4, 0, 4, 1, 4, 2, 4, 3, 4
 		c. Number of reads and writes are compared after accessing all pages.
-
 
 ***************************dberror.h**************************************
 Created additional error codes in header files as follows:
