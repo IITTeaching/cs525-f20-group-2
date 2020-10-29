@@ -13,7 +13,8 @@ typedef enum ReplacementStrategy {
 	RS_LRU = 1,
 	RS_CLOCK = 2,
 	RS_LFU = 3,
-	RS_LRU_K = 4
+	RS_LRU_K = 4,
+	RS_GCLOCK = 5
 } ReplacementStrategy;
 
 // Data Types and Structures
