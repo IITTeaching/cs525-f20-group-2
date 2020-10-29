@@ -6,6 +6,19 @@
 #include "storage_mgr.h"
 
 const int int_size = sizeof(int);
+
+typedef struct TableDataManager
+{
+	BM_PageHandle bufferPageFileHandler;
+	int noOfScans;
+	RID recId;
+	BM_BufferPool bmManager;
+	int noOfTuples;
+	int unallocatedPage;
+	Expr *constraint;
+
+} TableDataManager;
+
 TableDataManager *tableDataManager;
 
 //************************************
@@ -31,49 +44,57 @@ extern RC shutdownRecordManager () {
 		tableDataManager = NULL;
 		free(tableDataManager);
 	}
-	return 0;
+	return RC_OK;
 }
 
+
+//Function creates a table using FIFO strategy with 100 pages
 extern RC createTable (char *name, Schema *schema) {
 	printf("Creating table/pagefile");
 	if (name == NULL || schema == NULL) {
 		return -1;
 	} else {
 		tableDataManager = (TableDataManager*) malloc(sizeof(TableDataManager));
-		initBufferPool(&tableDataManager->bmManager, name, 100, RS_FIFO, NULL);
-		char data[PAGE_SIZE];
-		char *filepagehandler = data;
-		if (filepagehandler != NULL) {
-			*(int*) filepagehandler = 0;
-			filepagehandler = filepagehandler + int_size;
-			*(int*) filepagehandler = 1;
-			filepagehandler = filepagehandler + int_size;
-			*(int*) filepagehandler = schema->numAttr;
-			filepagehandler = filepagehandler + int_size;
-			*(int*) filepagehandler = schema->keySize;
-			filepagehandler = filepagehandler + int_size;
+		int check = initBufferPool(&tableDataManager->bmManager, name, 100, RS_FIFO, NULL);
+		if (check != RC_OK) {
+			return RC_ERROR;
 		}
 		
+		char data[PAGE_SIZE];
+		char *filepagehandler = data;
+		
+		if (filepagehandler != NULL) {
+			*(int*) filepagehandler = 0;
+			filepagehandler += int_size;
+			*(int*) filepagehandler = 1;
+			filepagehandler += int_size;
+			*(int*) filepagehandler = schema->numAttr;
+			filepagehandler += int_size;
+			*(int*) filepagehandler = schema->keySize;
+			filepagehandler += int_size;
+		}
+		
+		//all the attributes present in schema are stored in the table 
 		int i=0;
 		do {
 			memmove(filepagehandler, schema->attrNames[i], 15);
-			filepagehandler = filepagehandler + 15;
+			filepagehandler += 15;
 			*(int*) filepagehandler = (int) schema->dataTypes[i];
-			filepagehandler = filepagehandler + int_size;
+			filepagehandler += int_size;
 			*(int*) filepagehandler = (int) schema->typeLength[i];
-			filepagehandler = filepagehandler + int_size;
+			filepagehandler += int_size;
 			i = i+1;
 		} while (i < schema->numAttr);
 		
 		SM_FileHandle pfhandler;
 		
-		int result = createPageFile(name);
+		int result = createPageFile(name); 							// create page file
 		if (result == checkresult(result)) { return result;}
-		result = openPageFile(name, &pfhandler);
+		result = openPageFile(name, &pfhandler);					// open the page file using file handler 
 		if (result == checkresult(result)) { return result;}
-		result = writeBlock(0, &pfhandler, data);
+		result = writeBlock(0, &pfhandler, data);					// writing first location of the file
 		if (result == checkresult(result)) { return result;}
-		result = closePageFile(&pfhandler);
+		result = closePageFile(&pfhandler);							// closing the file after writing 
 		if (result == checkresult(result)) { return result;}
 	}
 	return RC_OK;
@@ -85,30 +106,35 @@ extern RC openTable (RM_TableData *rel, char *name) {
 		return -1;
 	} else {
 		SM_PageHandle pagehandler;
-		rel->mgmtData = tableDataManager;
-		rel->name = name;
-		pinPage(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler, 0);
+		rel->mgmtData = tableDataManager;	// setting the table meta data to record manager
+		rel->name = name;					// setting the table name
+		int check = pinPage(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler, 0);
+		if (check != RC_OK) {
+			return RC_ERROR;
+		}
+		
 		pagehandler = (char*) tableDataManager->bufferPageFileHandler.data;
 		
 		tableDataManager->noOfTuples = *(int*)pagehandler;
-		pagehandler = pagehandler + int_size;
+		pagehandler += int_size;
 		tableDataManager->unallocatedPage = *(int*)pagehandler;
-		pagehandler = pagehandler + int_size;
+		pagehandler += int_size;
 		int numOfAttr = *(int*)pagehandler;
-		pagehandler = pagehandler + int_size;
+		pagehandler += int_size;
 		
 		Schema *tableSchema = (Schema*) malloc(sizeof(Schema));
 		tableSchema->attrNames = (char**) malloc(sizeof(char*) *numOfAttr);
 		
 		int i=0, j=0;
 		do {
-			tableSchema->attrNames[i] = (char*)malloc(15);
+			tableSchema->attrNames[i] = (char*)malloc(15);							//allocating space for attribute names of size 15
 			i = i+1;
 		} while (i < numOfAttr);
 		
-		tableSchema->dataTypes = (DataType*) malloc(sizeof(DataType) *numOfAttr);
-		tableSchema->typeLength = (int*) malloc(int_size*numOfAttr);
+		tableSchema->dataTypes = (DataType*) malloc(sizeof(DataType) *numOfAttr);	//allocating space for attribute types
+		tableSchema->typeLength = (int*) malloc(int_size*numOfAttr);				//allocating space for attribute length
 		tableSchema->numAttr = numOfAttr;
+		
 		do {
 			memmove(tableSchema->attrNames[j], pagehandler, 15);
 			pagehandler = pagehandler + 15;
@@ -119,7 +145,7 @@ extern RC openTable (RM_TableData *rel, char *name) {
 			j = j+1;
 		} while (j < tableSchema->numAttr);
 		
-		rel->schema = tableSchema;
+		rel->schema = tableSchema;													//newly created schema is set to table schema
 	}	
 	return RC_OK;
 }
