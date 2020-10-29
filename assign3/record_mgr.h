@@ -4,6 +4,12 @@
 #include "dberror.h"
 #include "expr.h"
 #include "tables.h"
+#include "buffer_mgr.h"
+#include "buffer_mgr_stat.h"
+#include "storage_mgr.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 // Bookkeeping for scans
 typedef struct RM_ScanHandle
