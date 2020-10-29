@@ -1,4 +1,162 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "record_mgr.h"
+#include "buffer_mgr.h"
+#include "storage_mgr.h"
+
+const int int_size = sizeof(int);
+TableDataManager *tableDataManager;
+
+//************************************
+int checkresult(int result);
+//************************************
+
+
+int checkresult(int result) {
+	if (result != RC_OK) { 
+		return result;
+	}
+	return -1;
+}
+
+// table and manager
+extern RC initRecordManager (void *mgmtData) {
+	(mgmtData != NULL) ? -1 : initStorageManager();
+	return RC_OK;
+}
+
+extern RC shutdownRecordManager () {
+	if(tableDataManager != NULL) {
+		tableDataManager = NULL;
+		free(tableDataManager);
+	}
+	return 0;
+}
+
+extern RC createTable (char *name, Schema *schema) {
+	printf("Creating table/pagefile");
+	if (name == NULL || schema == NULL) {
+		return -1;
+	} else {
+		tableDataManager = (TableDataManager*) malloc(sizeof(TableDataManager));
+		initBufferPool(&tableDataManager->bmManager, name, 100, RS_FIFO, NULL);
+		char data[PAGE_SIZE];
+		char *filepagehandler = data;
+		if (filepagehandler != NULL) {
+			*(int*) filepagehandler = 0;
+			filepagehandler = filepagehandler + int_size;
+			*(int*) filepagehandler = 1;
+			filepagehandler = filepagehandler + int_size;
+			*(int*) filepagehandler = schema->numAttr;
+			filepagehandler = filepagehandler + int_size;
+			*(int*) filepagehandler = schema->keySize;
+			filepagehandler = filepagehandler + int_size;
+		}
+		
+		int i=0;
+		do {
+			memmove(filepagehandler, schema->attrNames[i], 15);
+			filepagehandler = filepagehandler + 15;
+			*(int*) filepagehandler = (int) schema->dataTypes[i];
+			filepagehandler = filepagehandler + int_size;
+			*(int*) filepagehandler = (int) schema->typeLength[i];
+			filepagehandler = filepagehandler + int_size;
+			i = i+1;
+		} while (i < schema->numAttr);
+		
+		SM_FileHandle pfhandler;
+		
+		int result = createPageFile(name);
+		if (result == checkresult(result)) { return result;}
+		result = openPageFile(name, &pfhandler);
+		if (result == checkresult(result)) { return result;}
+		result = writeBlock(0, &pfhandler, data);
+		if (result == checkresult(result)) { return result;}
+		result = closePageFile(&pfhandler);
+		if (result == checkresult(result)) { return result;}
+	}
+	return RC_OK;
+}
+
+extern RC openTable (RM_TableData *rel, char *name) {
+	printf("Opening table/pagefile");
+	if (rel == NULL || name == NULL) {
+		return -1;
+	} else {
+		SM_PageHandle pagehandler;
+		rel->mgmtData = tableDataManager;
+		rel->name = name;
+		pinPage(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler, 0);
+		pagehandler = (char*) tableDataManager->bufferPageFileHandler.data;
+		
+		tableDataManager->noOfTuples = *(int*)pagehandler;
+		pagehandler = pagehandler + int_size;
+		tableDataManager->unallocatedPage = *(int*)pagehandler;
+		pagehandler = pagehandler + int_size;
+		int numOfAttr = *(int*)pagehandler;
+		pagehandler = pagehandler + int_size;
+		
+		Schema *tableSchema = (Schema*) malloc(sizeof(Schema));
+		tableSchema->attrNames = (char**) malloc(sizeof(char*) *numOfAttr);
+		
+		int i=0, j=0;
+		do {
+			tableSchema->attrNames[i] = (char*)malloc(15);
+			i = i+1;
+		} while (i < numOfAttr);
+		
+		tableSchema->dataTypes = (DataType*) malloc(sizeof(DataType) *numOfAttr);
+		tableSchema->typeLength = (int*) malloc(int_size*numOfAttr);
+		tableSchema->numAttr = numOfAttr;
+		do {
+			memmove(tableSchema->attrNames[j], pagehandler, 15);
+			pagehandler = pagehandler + 15;
+			tableSchema->dataTypes[j] = *(int*) pagehandler;
+			pagehandler = pagehandler + int_size;
+			tableSchema->typeLength[j] = *(int*) pagehandler;
+			pagehandler = pagehandler + int_size;
+			j = j+1;
+		} while (j < tableSchema->numAttr);
+		
+		rel->schema = tableSchema;
+	}	
+	return RC_OK;
+}
+
+extern RC closeTable (RM_TableData *rel) {
+	printf("Closing table/pagefile");
+	if (rel == NULL) {
+		return -1;
+	}
+	else {
+		TableDataManager *tdmanager = rel->mgmtData;
+		if (tdmanager != NULL) {
+			shutdownBufferPool(&tdmanager->bmManager);
+			return RC_OK;
+		}
+		return RC_OK;
+	}
+}
+
+extern RC deleteTable (char *name) {
+	printf("Deleting table/pagefile");
+	(name != NULL) ? destroyPageFile(name) : -1;
+	return RC_OK;
+}
+
+int getNumTuples (RM_TableData *rel) {
+	if (rel == NULL) {
+		return -1;
+	} else {
+		TableDataManager *tdmgr = rel->mgmtData;
+		if (tdmgr != NULL) {
+			int rowcount = tdmgr->noOfTuples;
+			return rowcount;
+		}
+		return -1;
+	}
+}
 
 /*-------------------------- Dealing with schemas -----------------------*/
 extern int getRecordSize (Schema *schema)
