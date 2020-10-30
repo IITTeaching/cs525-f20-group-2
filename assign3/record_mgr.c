@@ -1,9 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "record_mgr.h"
-#include "buffer_mgr.h"
-#include "storage_mgr.h"
 
 const int int_size = sizeof(int);
 
@@ -57,7 +52,7 @@ extern RC createTable (char *name, Schema *schema) {
 		tableDataManager = (TableDataManager*) malloc(sizeof(TableDataManager));
 		int check = initBufferPool(&tableDataManager->bmManager, name, 100, RS_FIFO, NULL);
 		if (check != RC_OK) {
-			return RC_ERROR;
+			//return RC_ERROR;
 		}
 		
 		char data[PAGE_SIZE];
@@ -110,7 +105,7 @@ extern RC openTable (RM_TableData *rel, char *name) {
 		rel->name = name;					// setting the table name
 		int check = pinPage(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler, 0);
 		if (check != RC_OK) {
-			return RC_ERROR;
+			//return RC_ERROR;
 		}
 		
 		pagehandler = (char*) tableDataManager->bufferPageFileHandler.data;
@@ -256,7 +251,7 @@ extern RC createRecord (Record **record, Schema *schema)
 	
 	(*record)->id.page=NO_PAGE;
 	(*record)->id.slot=-1;
-	
+
 	return RC_OK;
 }
 
@@ -269,6 +264,36 @@ extern RC freeRecord (Record *record)
 
 	free(record->data);
 	free(record);
+	return RC_OK;
+}
+
+RC attrOffset (Schema *schema, int attrNum, int *result)
+{
+	/*
+		Get the attribute offset.
+		Method taken from rm_serializer.c
+	*/
+	int offset = 0;
+	int attrPos = 0;
+
+	for(attrPos = 0; attrPos < attrNum; attrPos++)
+		switch (schema->dataTypes[attrPos])
+		{
+		case DT_STRING:
+			offset += schema->typeLength[attrPos];
+			break;
+		case DT_INT:
+			offset += sizeof(int);
+			break;
+		case DT_FLOAT:
+			offset += sizeof(float);
+			break;
+		case DT_BOOL:
+			offset += sizeof(bool);
+			break;
+		}
+
+	*result = offset;
 	return RC_OK;
 }
 
@@ -287,8 +312,10 @@ extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value)
 	
 	DataType attributeDataType;
 	int sizeOfAttribute, attributeOffset;
-	char *attributeLocation, *attributeValue;
+	char *attributeLocation;
+	auto attributeValue;
 	
+	sizeOfAttribute = attributeOffset = 0;
 	(*value) = (Value*) malloc(sizeof(Value));
 	
 	attributeDataType = schema->dataTypes[attrNum];
@@ -296,20 +323,21 @@ extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value)
 							(attributeDataType == DT_INT) ? sizeof(int) :
 							(attributeDataType == DT_FLOAT) ? sizeof(float) :
 							(attributeDataType == DT_BOOL) ? sizeof(bool) : RC_RM_UNKOWN_DATATYPE;
-							
+											
 	attrOffset(schema, attrNum, &attributeOffset);
 	attributeLocation = (record->data + attributeOffset);
 	(*value)->dt = attributeDataType;
-	memcpy(attributeValue, attributeLocation, sizeOfAttribute);
+	memcpy(&attributeValue, attributeLocation, sizeOfAttribute);
 	
 	if(attributeDataType == DT_STRING)
 	{
-		MAKE_STRING_VALUE((*value), attributeValue);
+		MAKE_STRING_VALUE((*value), attributeLocation);
+		(*value)->v.stringV[strlen(attributeLocation)-1] = '\0';
 	}
-	/*else
+	else
 	{
 		MAKE_VALUE((*value), attributeDataType, attributeValue);
-	}*/
+	}
 	
 	return RC_OK;
 }
@@ -327,11 +355,9 @@ extern RC setAttr (Record *record, Schema *schema, int attrNum, Value *value)
 
 	DataType attributeDataType;
 	int sizeOfAttribute, attributeOffset;
-	char *attributeLocation, *attributeValue;
-	Value *intermediateResult;
+	char *attributeLocation;
 	
-	(intermediateResult) = (Value*) malloc(sizeof(Value));
-	
+	sizeOfAttribute = attributeOffset = 0;
 	attributeDataType = schema->dataTypes[attrNum];
 	sizeOfAttribute = (attributeDataType == DT_STRING) ? schema->typeLength[attrNum] :
 							(attributeDataType == DT_INT) ? sizeof(int) :
@@ -341,17 +367,11 @@ extern RC setAttr (Record *record, Schema *schema, int attrNum, Value *value)
 	attrOffset(schema, attrNum, &attributeOffset);
 	attributeLocation = (record->data + attributeOffset);
 	
-	/*if(attributeDataType == DT_STRING)
-	{
-		MAKE_STRING_VALUE(intermediateResult, (*value));
-	}
-	else
-	{
-		MAKE_VALUE(intermediateResult, attributeDataType, (*value));
-		(attributeDataType == DT_INT) ? (memcpy(attributeLocation,intermediateResult->v.intV, sizeOfAttribute)) :
-		(attributeDataType == DT_FLOAT) ? (memcpy(attributeLocation,intermediateResult->v.floatV, sizeOfAttribute)) :
-		(attributeDataType == DT_BOOL) ? (memcpy(attributeLocation,intermediateResult->v.boolV, sizeOfAttribute)) : RC_RM_UNKOWN_DATATYPE;
-	}*/
+	(attributeDataType == DT_STRING) ? (memcpy(attributeLocation,(value->v.stringV), sizeOfAttribute)) :
+	(attributeDataType == DT_INT) ? (memcpy(attributeLocation,&((value->v.intV)), sizeOfAttribute)) :
+	(attributeDataType == DT_FLOAT) ? (memcpy(attributeLocation,&((value->v.floatV)), sizeOfAttribute)) :
+	(attributeDataType == DT_BOOL) ? (memcpy(attributeLocation,&((value->v.boolV)), sizeOfAttribute)) : RC_RM_UNKOWN_DATATYPE;
 
 	return RC_OK;
+
 }
