@@ -83,7 +83,7 @@ serializeTableInfo(RM_TableData *rel)
 	RETURN_STRING(result);
 }
 
-char *
+/*char *
 serializeTableContent(RM_TableData *rel)
 {
 	int i;
@@ -105,7 +105,7 @@ serializeTableContent(RM_TableData *rel)
 	closeScan(sc);
 
 	RETURN_STRING(result);
-}
+}*/
 
 
 char *
@@ -160,7 +160,7 @@ serializeRecord(Record *record, Schema *schema)
 	for(i = 0; i < schema->numAttr; i++)
 	{
 		APPEND_STRING(result, serializeAttr (record, schema, i));
-		APPEND(result, "%s", (i == 0) ? "" : ",");
+		APPEND(result, "%s", (i == (schema->numAttr-1)) ? "" : ", ");
 	}
 
 	APPEND_STRING(result, ")");

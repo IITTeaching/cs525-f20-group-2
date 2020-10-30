@@ -66,49 +66,61 @@
 // test methods
 Schema* createSchemaTest (void);
 Schema* testSchema (void);
-static void createTableTest (void);
-static void viewTableTest (void);
-static void insertRecordTest (void);
-static void updateRecordTest (void);
-static void deleteRecordTest(void);
-static void updateColumnTest(void);
-static void viewColumnTest(void);
-static void deleteTableTest(void);
-static void dropTableTest(void);
+void createTableTest (void);
+void viewTableTest (void);
+RC createRecordTest (Schema *schema);
+Record* createSingleRecord(Schema *schema);
+Record* createMultipleRecords(Schema *schema);
+void viewRecords(Schema *schema, Record *record);
+void updateRecordTest (void);
+void deleteRecordTest(void);
+void updateColumnTest(void);
+void viewColumnTest(void);
+void deleteTableTest(void);
+void dropTableTest(void);
 
 // main method
 int 
 main (void) 
 {
+	printf("\n########################################################");
 	printf("\n########## Menu based Record Manager Testing ###########");
 	printf("\n########################################################");
 	
 	Schema *schema;
+	RC status;
 	
 	schema = createSchemaTest();
 	char *schemaDetails = serializeSchema(schema);
 	
-	printf("\n SCHEMA DETAILS : \n %s\n",schemaDetails);
+	printf("\n Schema is created successfully.\n");
+	printf("\n########################################################");
+	printf("\n SCHEMA DETAILS : \n %s",schemaDetails);
+	printf("\n########################################################");
 
+	status = createRecordTest(schema);
+	if(status == RC_OK)
+		printf("\n Record Operations Successfully Completed.\n");
+		
 	return 0;
 }
 
 Schema* createSchemaTest()
 {
 	Schema *result;
-	int numOfAttributes, menuOption, i, keyIndex, type, size, schemaOption;
+	int numOfAttributes, menuOption, i, keyIndex, type, size, schemaOption, end, scanStatus;
 	char isPK = '\0';
-	char buf[BUFSIZ], name[BUFSIZ];
-   int end,peek;
+	char name[BUFSIZ], buf[BUFSIZ];
 	
 	schemaOption = numOfAttributes = keyIndex = type = size = 0;
 	
+	START_SCHEMA:
 	printf("\n Please enter option : ");
 	printf("\n 1. Create new Schema\n 2. Use internal schema : \t");
 	fflush(stdout);
-	while (scanf("%d", &schemaOption) != 1 || ((peek = getchar()) != EOF && !isspace(peek)))
+	while (fgets(buf, sizeof buf, stdin) == NULL || sscanf(buf, "%d%n", &schemaOption, &end) != 1 || !isspace(buf[end]))
 	{
-		printf("Invalid integer.\nPlease try again: ");
+		printf("\n Invalid integer.\n Please try again: ");
 		fflush(stdout);
 	}
 	
@@ -119,9 +131,9 @@ Schema* createSchemaTest()
 		printf("\n Enter total number of attributes :\t");
 		fflush(stdout);
 	
-		while (scanf("%d", &numOfAttributes) != 1 || ((peek = getchar()) != EOF && !isspace(peek)))
+		while (fgets(buf, sizeof buf, stdin) == NULL || sscanf(buf, "%d%n", &numOfAttributes, &end) != 1 || !isspace(buf[end]))
 		{
-			printf("Invalid integer.\nPlease try again: ");
+			//printf("\n Invalid integer.\n Please try again: \t");
 			fflush(stdout);
 		}
     
@@ -129,15 +141,14 @@ Schema* createSchemaTest()
 		char *names[numOfAttributes][BUFSIZ];
 		for(i=0; i < numOfAttributes; i++)
 		{
-			end=0;
 			printf("\n For Attribute %d -",i+1);
 			printf("\n Enter attribute name : "); scanf("%s",&name); strcpy(names[i],name);
 		
 			printf("\n Enter attribute data type - (0 - Int, 1 - String, 2 - Float, 3 - Boolean) :\t");
 			fflush(stdout);
-			while (scanf("%d", &type) != 1 || ((peek = getchar()) != EOF && !isspace(peek)))
+			while (fgets(buf, sizeof buf, stdin) == NULL || sscanf(buf, "%d%n", &type, &end) != 1 || !isspace(buf[end]))
     		{
-      		printf("Invalid integer.\nPlease try again: ");
+      		//printf("Invalid integer.\nPlease try again: \t");
 	        	fflush(stdout);
   		  	}
 			types[i]=type;
@@ -146,9 +157,9 @@ Schema* createSchemaTest()
 			{
 				printf("\n Enter length for string :\t"); 
 				fflush(stdout);
-				while (scanf("%d", &size) != 1 || ((peek = getchar()) != EOF && !isspace(peek)))
+				while (fgets(buf, sizeof buf, stdin) == NULL || sscanf(buf, "%d%n", &size, &end) != 1 || !isspace(buf[end]))
   	  			{
-    		  		printf("Invalid integer.\nPlease try again: ");
+    		  		//printf("Invalid integer.\nPlease try again: \t");
     	    		fflush(stdout);
     			}
 				sizes[i]=size;
@@ -182,17 +193,21 @@ Schema* createSchemaTest()
 		memcpy(cpKeys, keys, sizeof(int) * keyIndex);
 
 		result = createSchema(numOfAttributes, cpNames, cpDt, cpSizes, keyIndex, cpKeys);
+		return result;
 	}
-	else
+	if(schemaOption == 2)
 	{
 		result = testSchema();
+		return result;
 	}
-	
-	return result;
+	else 
+	{
+		printf("\n Invalid option.\n");
+		goto START_SCHEMA;
+	}
 }
 
-Schema *
-testSchema (void)
+Schema* testSchema (void)
 {
 	Schema *result;
 	char *names[] = { "a", "b", "c" };
@@ -219,3 +234,128 @@ testSchema (void)
 	return result;
 }
 
+RC createRecordTest(Schema* schema)
+{
+	int numOfAttributes, recordOption, i, keyIndex, type, size, schemaOption, end;
+	char isPK = '\0';
+	char name[BUFSIZ],buf[BUFSIZ];
+   
+   Record *record;
+   recordOption = 0;
+	
+	START_RECORD:
+	while(recordOption!=4)
+	{
+		printf("\n Choose operation to be performed for records:\n 1. Insert Single Record.\n 2. Insert Multiple Records.\n 3. View Records.\n 4. Exit Record Operations: \t");
+		fflush(stdout);
+		while (fgets(buf, sizeof buf, stdin) == NULL || sscanf(buf, "%d%n", &recordOption, &end) != 1 || !isspace(buf[end]))
+		{
+			//printf("\n Invalid integer.\n Please try again: ");
+			fflush(stdout);
+		}
+		
+		if(recordOption == 1)
+		{	
+			printf("\n--------------------------------------------------------");
+			printf("\n Creating Single Record:");
+			printf("\n--------------------------------------------------------");
+			
+			record = createSingleRecord(schema);
+		}
+		else if(recordOption == 2)
+		{
+			printf("\n--------------------------------------------------------");
+			printf("\n Creating Multiple Records:");
+			printf("\n--------------------------------------------------------");
+		}
+		else if(recordOption == 3)
+		{
+			printf("\n--------------------------------------------------------");
+			printf("\n Records In Schema Are:");
+			printf("\n--------------------------------------------------------");
+			
+			viewRecords(schema, record);
+		}
+		else if(recordOption == 4)
+		{
+			return RC_OK;
+		}
+		else 
+		{
+			printf("\n Invalid option.\n");
+			goto START_RECORD;
+		}
+	}
+	
+	return RC_OK;
+}
+
+Record* createSingleRecord(Schema *schema)
+{
+	Record *result;
+	Value *value;
+	
+	int numOfAttr, i, attrDataType, attrLength;
+
+	numOfAttr = i = attrDataType = 0;
+	
+	numOfAttr = schema->numAttr;
+	createRecord(&result, schema);
+	
+	for(i = 0; i<numOfAttr; i++)
+	{
+		attrDataType = schema->dataTypes[i];
+		attrLength = schema->typeLength[i];
+		printf("\n Enter value for <%s>: \t",schema->attrNames[i]);
+		switch(attrDataType)
+		{
+			case DT_STRING:
+					{
+						char attrVal[attrLength];
+						scanf("%s", attrVal); 
+						//gets(attrVal);
+						MAKE_STRING_VALUE(value, attrVal);
+						break;
+					}
+			case DT_INT:
+					{
+						int attrVal;
+						scanf("%d",&attrVal);
+						MAKE_VALUE(value, DT_INT, attrVal);
+						break;
+					}
+			case DT_FLOAT:
+					{
+						float attrVal;
+						scanf("%f",&attrVal);
+						MAKE_VALUE(value, DT_FLOAT, attrVal);
+						break;
+					}
+			case DT_BOOL:
+					{
+						int attrVal;
+						scanf("%d",&attrVal);
+						MAKE_VALUE(value, DT_BOOL, attrVal);
+						break;
+					}
+		}
+		
+		setAttr(result, schema, i, value);
+		freeVal(value);
+	}
+
+	return result;
+}
+
+Record* createMultipleRecords(Schema *schema)
+{
+}
+
+void viewRecords(Schema *schema, Record *record)
+{
+	char *recodsDetails = serializeRecord(record, schema);
+
+	printf("\n########################################################");
+	printf("\n RECORD DETAILS : \n %s",recodsDetails);
+	printf("\n########################################################");	
+}
