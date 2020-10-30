@@ -1,14 +1,14 @@
 /*
 	Menu based testing
-	1. create schema
-			enter number of columns
-			enter column names (delimiter = ',')
-			enter data types of columns in sequence as of columns (delimiter = ',')
-			enter lengths for each data type  (delimiter = ',')
-			enter number of pk columns
-			enter pk column names
-		or use existing schema
-		show schema name, attribute names, types, lengths and pk
+	1. Schema
+			a. Create new schema
+				i. Enter number of attributes
+				ii. For each attribute
+					 Enter name
+					 Enter data type
+					 Enter size for string
+					 Enter if pk
+			b. Use existing schema
 		
 	2. create table
 			enter table name
@@ -58,12 +58,14 @@
 #include <stdlib.h>
 #include "dberror.h"
 #include "expr.h"
+#include "tables.h"
 #include "record_mgr.h"
 #include "tables.h"
 #include "test_helper.h"
 
 // test methods
-static void createSchemaTest (void);
+Schema* createSchemaTest (void);
+Schema* testSchema (void);
 static void createTableTest (void);
 static void viewTableTest (void);
 static void insertRecordTest (void);
@@ -78,57 +80,142 @@ static void dropTableTest(void);
 int 
 main (void) 
 {
-	char *testName = "Menu based Record Manager Testing";
-
-	int schemaOption=0, tableOption=0, menuOption=0;
+	printf("\n########## Menu based Record Manager Testing ###########");
+	printf("\n########################################################");
 	
+	Schema *schema;
 	
-	while(schemaOption!=3)
-	{
-		printf("\n################ Record Manager Testing ################");
-		printf("\n########################################################");
-		printf("\n Select a Schema option:");
-		printf("\n########################################################");
-		printf("\n1. Create Schema");
-		printf("\n2. Use existing Schema");
-		printf("\n3. Exit from program");
-		printf("\n########################################################\n");
+	schema = createSchemaTest();
+	char *schemaDetails = serializeSchema(schema);
 	
-		scanf("%d",&schemaOption);
-	
-		while(tableOption!=3 && schemaOption!=3)
-		{
-			printf("\n########################################################");
-			printf("\n Select a Table option:");
-			printf("\n########################################################");
-			printf("\n1. Create Table");
-			printf("\n2. Use existing Table");
-			printf("\n3. Exit to main menu");
-			printf("\n########################################################\n");
-
-			scanf("%d",&tableOption);
-			
-			while(menuOption!=11 && tableOption!=3)
-			{
-				printf("\n########################################################");
-				printf("\n Select an option for operations:");
-				printf("\n########################################################");
-				printf("\n1. View Table Data");
-				printf("\n2. Insert Record");
-				printf("\n3. Update Record");
-				printf("\n4. Delete Record");
-				printf("\n5. Update Column");
-				printf("\n6. View Column");
-				printf("\n7. Delete Table");
-				printf("\n8. Drop Table");
-				printf("\n9. Back To Table Selection");
-				printf("\n10. Back To Schema Selection");
-				printf("\n11. Exit From Program");
-				printf("\n########################################################\n");
-				scanf("%d",&menuOption);
-			}
-		}
-	}
+	printf("\n SCHEMA DETAILS : \n %s\n",schemaDetails);
 
 	return 0;
 }
+
+Schema* createSchemaTest()
+{
+	Schema *result;
+	int numOfAttributes, menuOption, i, keyIndex, type, size, schemaOption;
+	char isPK = '\0';
+	char buf[BUFSIZ], name[BUFSIZ];
+   int end,peek;
+	
+	schemaOption = numOfAttributes = keyIndex = type = size = 0;
+	
+	printf("\n Please enter option : ");
+	printf("\n 1. Create new Schema\n 2. Use internal schema : \t");
+	fflush(stdout);
+	while (scanf("%d", &schemaOption) != 1 || ((peek = getchar()) != EOF && !isspace(peek)))
+	{
+		printf("Invalid integer.\nPlease try again: ");
+		fflush(stdout);
+	}
+	
+	if(schemaOption == 1)
+	{
+		printf("\n Creating new Schema:");
+		printf("\n########################################################");
+		printf("\n Enter total number of attributes :\t");
+		fflush(stdout);
+	
+		while (scanf("%d", &numOfAttributes) != 1 || ((peek = getchar()) != EOF && !isspace(peek)))
+		{
+			printf("Invalid integer.\nPlease try again: ");
+			fflush(stdout);
+		}
+    
+		int types[numOfAttributes], sizes[numOfAttributes], keys[numOfAttributes];
+		char *names[numOfAttributes][BUFSIZ];
+		for(i=0; i < numOfAttributes; i++)
+		{
+			end=0;
+			printf("\n For Attribute %d -",i+1);
+			printf("\n Enter attribute name : "); scanf("%s",&name); strcpy(names[i],name);
+		
+			printf("\n Enter attribute data type - (0 - Int, 1 - String, 2 - Float, 3 - Boolean) :\t");
+			fflush(stdout);
+			while (scanf("%d", &type) != 1 || ((peek = getchar()) != EOF && !isspace(peek)))
+    		{
+      		printf("Invalid integer.\nPlease try again: ");
+	        	fflush(stdout);
+  		  	}
+			types[i]=type;
+		
+			if(type == 1)
+			{
+				printf("\n Enter length for string :\t"); 
+				fflush(stdout);
+				while (scanf("%d", &size) != 1 || ((peek = getchar()) != EOF && !isspace(peek)))
+  	  			{
+    		  		printf("Invalid integer.\nPlease try again: ");
+    	    		fflush(stdout);
+    			}
+				sizes[i]=size;
+			}
+			else
+			{
+				sizes[i] = 0;
+			}
+		
+			printf("\n Is this column part of PK (Y/N) : "); 
+			scanf("%c",&isPK);
+			if(isPK == 'Y' || isPK == 'y')
+			{
+				keys[keyIndex] = i;
+				keyIndex++;
+			}
+		}
+	
+		char **cpNames = (char **) malloc(sizeof(char*) * numOfAttributes);
+		DataType *cpDt = (DataType *) malloc(sizeof(DataType) * numOfAttributes);
+		int *cpSizes = (int *) malloc(sizeof(int) * numOfAttributes);
+		int *cpKeys = (int *) malloc(sizeof(int) * keyIndex);
+
+		for(i = 0; i < numOfAttributes; i++)
+		{
+			cpNames[i] = (char *) malloc(2);
+			strcpy(cpNames[i], names[i]);
+		}
+		memcpy(cpDt, types, sizeof(DataType) * numOfAttributes);
+		memcpy(cpSizes, sizes, sizeof(int) * numOfAttributes);
+		memcpy(cpKeys, keys, sizeof(int) * keyIndex);
+
+		result = createSchema(numOfAttributes, cpNames, cpDt, cpSizes, keyIndex, cpKeys);
+	}
+	else
+	{
+		result = testSchema();
+	}
+	
+	return result;
+}
+
+Schema *
+testSchema (void)
+{
+	Schema *result;
+	char *names[] = { "a", "b", "c" };
+	DataType dt[] = { DT_INT, DT_STRING, DT_INT };
+	int sizes[] = { 0, 4, 0 };
+	int keys[] = {0};
+	int i;
+	char **cpNames = (char **) malloc(sizeof(char*) * 3);
+	DataType *cpDt = (DataType *) malloc(sizeof(DataType) * 3);
+	int *cpSizes = (int *) malloc(sizeof(int) * 3);
+	int *cpKeys = (int *) malloc(sizeof(int));
+
+	for(i = 0; i < 3; i++)
+	{
+		cpNames[i] = (char *) malloc(2);
+		strcpy(cpNames[i], names[i]);
+	}
+	memcpy(cpDt, dt, sizeof(DataType) * 3);
+	memcpy(cpSizes, sizes, sizeof(int) * 3);
+	memcpy(cpKeys, keys, sizeof(int));
+
+	result = createSchema(3, cpNames, cpDt, cpSizes, 1, cpKeys);
+
+	return result;
+}
+
