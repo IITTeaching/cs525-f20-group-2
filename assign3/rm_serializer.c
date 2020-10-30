@@ -83,7 +83,7 @@ serializeTableInfo(RM_TableData *rel)
 	RETURN_STRING(result);
 }
 
-/*char *
+char *
 serializeTableContent(RM_TableData *rel)
 {
 	int i;
@@ -105,7 +105,7 @@ serializeTableContent(RM_TableData *rel)
 	closeScan(sc);
 
 	RETURN_STRING(result);
-}*/
+}
 
 
 char *
