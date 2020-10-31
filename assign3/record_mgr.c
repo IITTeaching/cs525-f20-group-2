@@ -247,13 +247,13 @@ void deserializeAttr(RM_TableData *RM, Record *record, char *str1, char *str2, i
 						int data_val;
 						data_val=strtol(str1, &str2, 10);
 						MAKE_VALUE(val, DT_INT, data_val);
-						setAttr(rec,RM->schema, i, val);
+						setAttr(record,RM->schema, i, val);
 					 }
 							 break;
 					 case DT_STRING:
 					 {
 						 MAKE_STRING_VALUE(val, str1);
-						 setAttr(rec,RM->schema, i, val);
+						 setAttr(record,RM->schema, i, val);
 					 }
 							 break;
 					 case DT_FLOAT:
@@ -261,7 +261,7 @@ void deserializeAttr(RM_TableData *RM, Record *record, char *str1, char *str2, i
 						float data_val;
 						data_val=strtof(str1, NULL);
 						MAKE_VALUE(val, DT_FLOAT, data_val);
-						setAttr(rec,RM->schema, i, val);
+						setAttr(record,RM->schema, i, val);
 					 }
 							 break;
 					 case DT_BOOL:
@@ -269,13 +269,14 @@ void deserializeAttr(RM_TableData *RM, Record *record, char *str1, char *str2, i
 						 bool data_val;
 						 data_val = (str1[0] == 't') ? TRUE : FALSE;
 		 				 MAKE_VALUE(val, DT_BOOL, data_val);
-		 				 setAttr(rec,RM->schema, i, val);
+		 				 setAttr(record,RM->schema, i, val);
 					 }
 							 break;
 			 }
+			 freeVal(val);
 	 }
-	 freeVal(val);
-}
+
+
 Record *deserializeRecord(char *rec_str, RM_TableData *RM)
 	{
 
@@ -384,7 +385,7 @@ extern RC deleteRecord (RM_TableData *rel, RID id)
 
 			char *dataPage = pageFileHandler->data;
 			int slotlength = slotlen(rel->schema);
-	    memset(dataPage + (slotNo * slotlength),  "\0", strlen(dataPage + (slotNo * slotlength)));
+	    memcpy(dataPage + (slotNo * slotlength),  "\0", strlen(dataPage + (slotNo * slotlength)));
 
 			markDirty(bufferpool, pageFileHandler);
 			unpinPage(bufferpool, pageFileHandler);
