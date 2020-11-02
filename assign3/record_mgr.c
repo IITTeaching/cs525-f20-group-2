@@ -194,8 +194,8 @@ int getNumTuples (RM_TableData *rel) {
 	}
 }
 
-int calculateFreeSlot(int pageNo,TableDataManager *tabledatamanager){
-	RM_TableData *rel;
+int calculateFreeSlot(RM_TableData *rel, int pageNo,TableDataManager *tabledatamanager){
+
 	tabledatamanager = (TableDataManager *)(rel->mgmtData);
 	int slotNo = tabledatamanager->noOfTuples - ((pageNo - tabledatamanager->firstRecordPage) * tabledatamanager->maxSlots);
 	return slotNo;
@@ -310,29 +310,29 @@ Record *deserializeRecord(char *rec_str, RM_TableData *RM)
 		free(rec_str);
 		return record;
 	}
-extern RC initializerecord(Schema *schema){
-		RM_TableData *rel;
+extern RC initializerecord(RM_TableData *rel){
 
 		tableDataManager = (TableDataManager *) malloc(sizeof(TableDataManager));
 
-		tableDataManager->firstRecordPage=totalFilelen(schema)+1;
-		tableDataManager->lastRecordPage=totalFilelen(schema)+1;
-		tableDataManager->maxSlots= maxSlots(schema);
+		tableDataManager->firstRecordPage=totalFilelen(rel->schema)+1;
+		tableDataManager->lastRecordPage=totalFilelen(rel->schema)+1;
+		tableDataManager->maxSlots= maxSlots(rel->schema);
 		rel->mgmtData=tableDataManager;
+
 		return RC_OK;
 
 	}
 extern RC insertRecord (RM_TableData *rel, Record *record)
 {
-				BM_PageHandle *pageFileHandler = (BM_PageHandle*)malloc(sizeof(BM_PageHandle));
+
 				SM_PageHandle ph = (SM_PageHandle) malloc(PAGE_SIZE);
-				BM_BufferPool *bufferpool;
-				SM_FileHandle *fileHandler;
-		    initializerecord(rel->schema);
+				SM_FileHandle fileHandler;
+		    initializerecord(rel);
 			  tableDataManager = (TableDataManager *)(rel->mgmtData);
 
 				int pageNo = tableDataManager->lastRecordPage;
-				int slotNo = calculateFreeSlot(pageNo,tableDataManager);
+				int slotNo = calculateFreeSlot(rel,pageNo,tableDataManager);
+
 				int slotlength = slotlen(rel->schema);
 				RC result;
 
@@ -346,103 +346,101 @@ extern RC insertRecord (RM_TableData *rel, Record *record)
 				record->id.page=pageNo;
 				record->id.slot=slotNo;
 
-				pinPage(bufferpool, pageFileHandler, pageNo);
+				pinPage(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler, pageNo);
 
-				char *serialize =serializeRecord(record,rel->schema);
-				char *dataPage = pageFileHandler->data;
+				char *serialize;
+				char *dataPage;
+				serialize=serializeRecord(record,rel->schema);
+				dataPage = (char*) tableDataManager->bufferPageFileHandler.data;
 				memcpy(dataPage + (slotNo * slotlength), serialize, strlen(serialize) );
 				free(serialize);
 
-				markDirty(bufferpool, pageFileHandler);
-				unpinPage(bufferpool, pageFileHandler);
-				forcePage(bufferpool, pageFileHandler);
+				markDirty(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler);
+				unpinPage(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler);
+				forcePage(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler);
 				tableDataManager->noOfTuples++;
 
-				result = openPageFile(rel->name, fileHandler);
+				result = openPageFile(rel->name, &fileHandler);
 				if (result != RC_OK) { return result;}
-				result = writeBlock(0, fileHandler, ph);
+				result = writeBlock(0, &fileHandler, ph);
 				if (result != RC_OK) { return result;}
-				result = closePageFile(fileHandler);
+				result = closePageFile(&fileHandler);
 				if (result != RC_OK) { return result;}
 
-				free(pageFileHandler);
+				//free(pageFileHandler);
 				return RC_OK;
 }
 
 extern RC deleteRecord (RM_TableData *rel, RID id)
 {
-			BM_PageHandle *pageFileHandler = (BM_PageHandle*)malloc(sizeof(BM_PageHandle));
+
 			SM_PageHandle ph = (SM_PageHandle) malloc(PAGE_SIZE);
-			BM_BufferPool *bufferpool;
-			SM_FileHandle *fileHandler;
+			SM_FileHandle fileHandler;
 			tableDataManager = (TableDataManager *)(rel->mgmtData);
 			RC result;
 
 	    int pageNo = id.page;
 	    int slotNo = id.slot;
 
-	    pinPage(bufferpool, pageFileHandler, pageNo);
+	    pinPage(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler, pageNo);
 
-			char *dataPage = pageFileHandler->data;
+			char *dataPage = (char*) tableDataManager->bufferPageFileHandler.data;
 			int slotlength = slotlen(rel->schema);
 	    memcpy(dataPage + (slotNo * slotlength),  "\0", strlen(dataPage + (slotNo * slotlength)));
 
-			markDirty(bufferpool, pageFileHandler);
-			unpinPage(bufferpool, pageFileHandler);
-			forcePage(bufferpool, pageFileHandler);
+			markDirty(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler);
+			unpinPage(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler);
+			forcePage(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler);
 			tableDataManager->noOfTuples--;
 
-			result = openPageFile(rel->name, fileHandler);
+			result = openPageFile(rel->name, &fileHandler);
 			if (result != RC_OK) { return result;}
-			result = writeBlock(0, fileHandler, ph);
+			result = writeBlock(0, &fileHandler, ph);
 			if (result != RC_OK) { return result;}
-			result = closePageFile(fileHandler);
+			result = closePageFile(&fileHandler);
 			if (result != RC_OK) { return result;}
 
-			free(pageFileHandler);
+			//free(pageFileHandler);
 	    return RC_OK;
 }
 
 extern RC updateRecord (RM_TableData *rel, Record *record)
 {
-			BM_PageHandle *pageFileHandler = (BM_PageHandle*)malloc(sizeof(BM_PageHandle));
+
 			SM_PageHandle ph = (SM_PageHandle) malloc(PAGE_SIZE);
-			BM_BufferPool *bufferpool;
-			SM_FileHandle *fileHandler;
+
+			SM_FileHandle fileHandler;
 			RC result;
 
 			int pageNo = record->id.page;
 			int slotNo = record->id.slot;
 			int slotlength = slotlen(rel->schema);
 
-			pinPage(bufferpool, pageFileHandler, pageNo);
+			pinPage(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler, pageNo);
 
 			char *serialize =serializeRecord(record,rel->schema);
-			char *dataPage = pageFileHandler->data;
+			char *dataPage = (char*) tableDataManager->bufferPageFileHandler.data;
 			memcpy(dataPage + (slotNo * slotlength), serialize, strlen(serialize) );
 			free(serialize);
 
-			markDirty(bufferpool, pageFileHandler);
-			unpinPage(bufferpool, pageFileHandler);
-			forcePage(bufferpool, pageFileHandler);
+			markDirty(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler);
+			unpinPage(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler);
+			forcePage(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler);
 
-			result = openPageFile(rel->name, fileHandler);
+			result = openPageFile(rel->name, &fileHandler);
 			if (result != RC_OK) { return result;}
-			result = writeBlock(0, fileHandler, ph);
+			result = writeBlock(0, &fileHandler, ph);
 			if (result != RC_OK) { return result;}
-			result = closePageFile(fileHandler);
+			result = closePageFile(&fileHandler);
 			if (result != RC_OK) { return result;}
 
-			free(pageFileHandler);
+			//free(pageFileHandler);
 			return RC_OK;
 
 }
 
 extern RC getRecord (RM_TableData *rel, RID id, Record *record)
 {
-				BM_PageHandle *pageFileHandler = (BM_PageHandle*)malloc(sizeof(BM_PageHandle));
-				BM_BufferPool *bufferpool;
-
 				int pageNo = id.page;
 				int slotNo = id.slot;
 				int slotlength = slotlen(rel->schema);
@@ -450,20 +448,20 @@ extern RC getRecord (RM_TableData *rel, RID id, Record *record)
 				record->id.page = pageNo;
 				record->id.slot = slotNo;
 
-				pinPage(bufferpool, pageFileHandler, pageNo);
+				pinPage(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler, pageNo);
 
 				char *str = (char *) malloc(sizeof(char) * slotlength);
-				char *dataPage = pageFileHandler->data;
-				memcpy(str, pageFileHandler->data + (slotNo * slotlength), sizeof(char) * slotlength );
+				char *dataPage = (char*) tableDataManager->bufferPageFileHandler.data;
+				memcpy(str, dataPage + (slotNo * slotlength), sizeof(char) * slotlength );
 
-				markDirty(bufferpool, pageFileHandler);
-				unpinPage(bufferpool, pageFileHandler);
+				markDirty(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler);
+				unpinPage(&tableDataManager->bmManager, &tableDataManager->bufferPageFileHandler);
 
 				Record *deserialize = deserializeRecord(str, rel);
         record->data = deserialize->data;
 
         free(deserialize);
-				free(pageFileHandler);
+				//free(pageFileHandler);
 			  return RC_OK;
 }
 
