@@ -246,7 +246,8 @@ RC createRecordTest(Schema* schema)
 	START_RECORD:
 	while(recordOption!=4)
 	{
-		printf("\n Choose operation to be performed for records:\n 1. Insert Single Record.\n 2. Insert Multiple Records.\n 3. View Records.\n 4. Exit Record Operations: \t");
+		//printf("\n Choose operation to be performed for records:\n 1. Insert Single Record.\n 2. Insert Multiple Records.\n 3. View Records.\n 4. Exit Record Operations: \t");
+		printf("\n Choose operation to be performed for records:\n 1. Insert Single Record.\n 2. View Record.\n 3. Exit Record Operations: \t");
 		fflush(stdout);
 		while (fgets(buf, sizeof buf, stdin) == NULL || sscanf(buf, "%d%n", &recordOption, &end) != 1 || !isspace(buf[end]))
 		{
@@ -265,18 +266,12 @@ RC createRecordTest(Schema* schema)
 		else if(recordOption == 2)
 		{
 			printf("\n--------------------------------------------------------");
-			printf("\n Creating Multiple Records:");
-			printf("\n--------------------------------------------------------");
-		}
-		else if(recordOption == 3)
-		{
-			printf("\n--------------------------------------------------------");
-			printf("\n Records In Schema Are:");
+			printf("\n Record In Schema Is:");
 			printf("\n--------------------------------------------------------");
 			
 			viewRecords(schema, record);
 		}
-		else if(recordOption == 4)
+		else if(recordOption == 3)
 		{
 			return RC_OK;
 		}
