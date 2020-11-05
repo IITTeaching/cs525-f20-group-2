@@ -34,7 +34,7 @@ RC createPageFile(char *fileName){
 
   fileDestroyed = 0;
   char *addressBlock = (char *) malloc(PAGE_SIZE * sizeof(char)); //Reserve the block of memory with the PAGE_SIZE
-  filePointer = fopen(fileName, "w"); //Open the file named fileName in write module
+  filePointer = fopen(fileName, "w+"); //Open the file named fileName in write module
 
   if(filePointer == NULL){
 
@@ -345,45 +345,41 @@ RC readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage){
 
 RC writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage) {
 
-	// Checking if the pageNumber parameter is less than Total number of pages and less than 0, then return respective error code
 
 	if (pageNum < 0) {
+
 		return RC_WRITE_FAILED;
+
 	}
 
-	// Checking if the pageNumber parameter is greater than Total number of pages, then handling the pageNum through ensureCapacity
-    if (pageNum > fHandle->totalNumPages) {
-		int result = ensureCapacity(pageNum + 1, fHandle);
-
-		if (RC_OK != result) {
-
-			return result;
-		}
-	}
-
-	// Opening file stream in read & write mode. 'r+' mode opens the file for both reading and writing.
-
+if (pageNum > fHandle->totalNumPages || pageNum < 0)
+        	return RC_WRITE_FAILED;
 	filePointer = fopen(fHandle->fileName, "r+");
-	if(filePointer == NULL) {
+	if(filePointer == NULL)
 		return RC_FILE_NOT_FOUND;
-	}
-	int ptr_start = pageNum * PAGE_SIZE;
-	int seekSuccess = fseek(filePointer, ptr_start, SEEK_SET);
+	int startPosition = pageNum * PAGE_SIZE;
+	if(pageNum == 0) {
+		fseek(filePointer, startPosition, SEEK_SET);
+		int i;
+		for(i = 0; i < PAGE_SIZE; i++)
+		{
+			if(feof(filePointer))
+				 appendEmptyBlock(fHandle);
+			fputc(memPage[i], filePointer);
+		}
 
-	if(seekSuccess == 0) {
-		fwrite(memPage, sizeof(char), strlen(memPage), filePointer); // Writing content from memPage to pageFile stream
-		fHandle->curPagePos = pageNum;
-		fHandle->totalNumPages++;
+		fHandle->curPagePos = ftell(filePointer);
 		fclose(filePointer);
 
+	} else {
+		fHandle->curPagePos = startPosition;
+		fclose(filePointer);
+		writeCurrentBlock(fHandle, memPage);
 	}
-
-	else {
-		return RC_WRITE_FAILED;
-	}
-return RC_OK;
-
+	return RC_OK;
 }
+
+
 
 /* Write a page to disk using current position */
 
@@ -465,4 +461,3 @@ filePointer = fopen(fHandle->fileName, "a");
 	return RC_OK;
 
 }
-

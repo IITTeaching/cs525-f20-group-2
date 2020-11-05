@@ -34,6 +34,10 @@ typedef int RC;
 #define RC_NON_EXISTING_PAGE_IN_FRAME 404
 #define RC_NO_MORE_EMPTY_FRAME 405
 
+#define RC_PINNED_PAGES_IN_BUFFER 500
+#define RC_RM_NO_TUPLE_WITH_GIVEN_RID 600
+#define RC_SCAN_CONDITION_NOT_FOUND 601
+
 /* holder for error messages */
 extern char *RC_message;
 
