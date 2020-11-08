@@ -628,7 +628,6 @@ extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value)
 
 	schema->dataTypes[attrNum] = (attrNum == 1) ? 1 : schema->dataTypes[attrNum];
 	attributeDataType = schema->dataTypes[attrNum];
-	printf("\n inside getAttr - attributeDataType = <%d>",attributeDataType);
 	sizeOfAttribute = (attributeDataType == DT_STRING) ? schema->typeLength[attrNum] :
 							(attributeDataType == DT_INT) ? sizeof(int) :
 							(attributeDataType == DT_FLOAT) ? sizeof(float) :
