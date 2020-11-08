@@ -618,47 +618,37 @@ extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value)
 		6. Call method to copy value from record attribute value to input argument value
 	*/
 
-	int offset = 0;
-	attrOffset(schema, attrNum, &offset);
-	Value *attribute = (Value*) malloc(sizeof(Value));
-	char *dataPage = record->data;
-	dataPage = dataPage + offset;
+	DataType attributeDataType;
+	int sizeOfAttribute, attributeOffset;
+	char *attributeLocation;
+	auto attributeValue;
+
+	sizeOfAttribute = attributeOffset = 0;
+	(*value) = (Value*) malloc(sizeof(Value));
+
 	schema->dataTypes[attrNum] = (attrNum == 1) ? 1 : schema->dataTypes[attrNum];
-	DataType type = schema->dataTypes[attrNum];
-	if (type == DT_STRING)
+	attributeDataType = schema->dataTypes[attrNum];
+	printf("\n inside getAttr - attributeDataType = <%d>",attributeDataType);
+	sizeOfAttribute = (attributeDataType == DT_STRING) ? schema->typeLength[attrNum] :
+							(attributeDataType == DT_INT) ? sizeof(int) :
+							(attributeDataType == DT_FLOAT) ? sizeof(float) :
+							(attributeDataType == DT_BOOL) ? sizeof(bool) : RC_RM_UNKOWN_DATATYPE;
+
+	attrOffset(schema, attrNum, &attributeOffset);
+	attributeLocation = (record->data + attributeOffset);
+	(*value)->dt = attributeDataType;
+	memcpy(&attributeValue, attributeLocation, sizeOfAttribute);
+
+	if(attributeDataType == DT_STRING)
 	{
-		int length = schema->typeLength[attrNum];
-		attribute->v.stringV = (char *) malloc(length + 1);
-		strncpy(attribute->v.stringV, dataPage, length);
-		attribute->v.stringV[length] = '\0';
-		attribute->dt = DT_STRING;
+		MAKE_STRING_VALUE((*value), attributeLocation);
+		(*value)->v.stringV[strlen(attributeLocation)-1] = '\0';
 	}
-	else if (type == DT_INT)
+	else
 	{
-		int value = 0;
-		memcpy(&value, dataPage, sizeof(int));
-		attribute->v.intV = value;
-		attribute->dt = DT_INT;
-	}
-	else if (type == DT_FLOAT)
-	{
-		float value;
-		memcpy(&value, dataPage, sizeof(float));
-		attribute->v.floatV = value;
-		attribute->dt = DT_FLOAT;
-	}
-	else if (type == DT_BOOL)
-	{
-		bool value;
-		memcpy(&value,dataPage, sizeof(bool));
-		attribute->v.boolV = value;
-		attribute->dt = DT_BOOL;
-	}
-	else {
-		printf("Serializer not defined for the given datatype. \n");
+		MAKE_VALUE((*value), attributeDataType, attributeValue);
 	}
 
-	*value = attribute;
 	return RC_OK;
 }
 
