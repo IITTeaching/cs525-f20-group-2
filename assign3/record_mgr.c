@@ -125,6 +125,7 @@ extern RC openTable (RM_TableData *rel, char *name)
     int check = pinPage(&tdManager->bp, &tdManager->pageHandle, 0);
 	if (check != RC_OK) {
 		printf("\n Inside openTable pinPage failed");
+		return check;
 	}
 	pageHandle = (char*) tdManager->pageHandle.data;
 	tdManager->noOfTuples= *(int*)pageHandle;
@@ -177,7 +178,14 @@ extern RC closeTable (RM_TableData *rel)
 		return -1;
 	} else {
 		TableDataManager *tdManager = rel->mgmtData;
-		shutdownBufferPool(&tdManager->bp);
+		shutdownBufferPool(&tdManager->bp);	
+		//free(rel->mgmtData);
+		free(rel->schema->dataTypes);
+		free(rel->schema->attrNames);
+		//free(rel->schema->keyAttrs);
+		free(rel->schema->typeLength);
+		//free(rel->schema);
+		
 		return RC_OK;
 	}
 }
@@ -535,6 +543,7 @@ extern Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes,
 	schema->typeLength = typeLength;
 	schema->keySize = keySize;
 	schema->keyAttrs = keys;
+	
 	return schema;
 }
 
@@ -543,6 +552,10 @@ extern RC freeSchema (Schema *schema)
 	/*
 		Free the size allocated while creating the schema
 	*/
+	free(schema->attrNames);
+	free(schema->dataTypes);
+	free(schema->typeLength);
+	free(schema->keyAttrs);
 	free(schema);
 	return RC_OK;
 }
@@ -600,7 +613,7 @@ extern RC freeRecord (Record *record)
 		Free the size allocated while creating the record.
 		Even if the page is NO_PAGE or slot is -, the memory is already allocated, so we need to free it
 	*/
-
+	free(record->data);
 	free(record);
 	return RC_OK;
 }
@@ -624,7 +637,6 @@ extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value)
 	auto attributeValue;
 
 	sizeOfAttribute = attributeOffset = 0;
-	(*value) = (Value*) malloc(sizeof(Value));
 
 	schema->dataTypes[attrNum] = (attrNum == 1) ? 1 : schema->dataTypes[attrNum];
 	attributeDataType = schema->dataTypes[attrNum];
@@ -635,7 +647,7 @@ extern RC getAttr (Record *record, Schema *schema, int attrNum, Value **value)
 
 	attrOffset(schema, attrNum, &attributeOffset);
 	attributeLocation = (record->data + attributeOffset);
-	(*value)->dt = attributeDataType;
+
 	memcpy(&attributeValue, attributeLocation, sizeOfAttribute);
 
 	if(attributeDataType == DT_STRING)
@@ -661,7 +673,7 @@ extern RC setAttr (Record *record, Schema *schema, int attrNum, Value *value)
 		3. Use attrOffset (rm_serializer.c) to get start location of that attribute value
 		4. Call method to copy value from input argument value to record attribute value
 	*/
-	//printf("\n\n inside set attr");
+
 	DataType attributeDataType;
 	int sizeOfAttribute, attributeOffset;
 	char *attributeLocation;
@@ -676,7 +688,6 @@ extern RC setAttr (Record *record, Schema *schema, int attrNum, Value *value)
 
 	attrOffset(schema, attrNum, &attributeOffset);
 	attributeLocation = (record->data + attributeOffset);
-	//printf("\ninside set attr data %s", record->data);
 
 	(attributeDataType == DT_STRING) ? (memcpy(attributeLocation,(value->v.stringV), sizeOfAttribute)) :
 	(attributeDataType == DT_INT) ? (memcpy(attributeLocation,&((value->v.intV)), sizeOfAttribute)) :
