@@ -11,48 +11,23 @@
 			b. Use existing schema
 		
 	2. create table
-			enter table name
-			enter schema name to be used for table
-		or use existing table
-		show table name and schema name.
+			Use schema created in step 1
 		
-	3. view table (get RID as well for further reference)
-		enter table name
-			condition 1=1
-			and number of records. all records.
-			
-		need to handle if two tables are viewed one after another. then need to shutdown pool and start again with new table name
-		
-	4. insert record
-		enter table name
-		enter record details (delimiter = ',')		
-		show RID after inserting record
+	3. insert records
+		get total number of records to be inserted.
+		insert the records in table created in step2
 				
-	5. update record
-		enter table name		
-		enter rid of record
-		enter record details (delimieter = ',')		
+	5. update record	
+		get record number and attribute name to be updated	
 		
 	6. delete record
-		enter table name
-		enter rid of record	
+		get total number of records to be deleted
+		get each record# and delete it	
 	
-	7. update column in record
-		enter table name
-		enter rid
-		enter column name
-		enter column new value
-		
-	8. get specific column value from record 
-		enter table name
-		enter rid
-		enter column name to retrieve value	
-	
-	9. delete from table
-		enter table name
+	7. delete table
+		deletes table file
 			
-	10. drop table
-		enter table name
+	8. exit from program
 */
 
 #include <stdlib.h>
@@ -64,20 +39,24 @@
 #include "test_helper.h"
 
 // test methods
-Schema* createSchemaTest (void);
-Schema* testSchema (void);
-void createTableTest (void);
-void viewTableTest (void);
-RC createRecordTest (Schema *schema);
-Record* createSingleRecord(Schema *schema);
-Record* createMultipleRecords(Schema *schema);
-void viewRecords(Schema *schema, Record *record);
-void updateRecordTest (void);
-void deleteRecordTest(void);
-void updateColumnTest(void);
-void viewColumnTest(void);
-void deleteTableTest(void);
-void dropTableTest(void);
+Schema* createSchemaTest();
+Schema* testSchema();
+void createTableTest();
+void viewTableTest();
+void tableOperations();
+Record* createSingleRecord();
+void insertRecordsTest();
+void updateRecordTest();
+void deleteRecordTest();
+void viewRecordTest();
+void deleteTableTest();
+
+Schema *schema;
+RM_TableData *table;
+RC status;
+char *tableName="testTable";
+RID *rids;
+int totalRecordsInTable=0;
 
 // main method
 int 
@@ -87,9 +66,6 @@ main (void)
 	printf("\n########## Menu based Record Manager Testing ###########");
 	printf("\n########################################################");
 	
-	Schema *schema;
-	RC status;
-	
 	schema = createSchemaTest();
 	char *schemaDetails = serializeSchema(schema);
 	
@@ -98,9 +74,10 @@ main (void)
 	printf("\n SCHEMA DETAILS : \n %s",schemaDetails);
 	printf("\n########################################################");
 
-	status = createRecordTest(schema);
-	if(status == RC_OK)
-		printf("\n Record Operations Successfully Completed.\n");
+	createTableTest();
+	printf("\n Table <%s> is created successfully.",tableName);
+
+	tableOperations();
 		
 	return 0;
 }
@@ -234,58 +211,148 @@ Schema* testSchema (void)
 	return result;
 }
 
-RC createRecordTest(Schema* schema)
+void createTableTest()
 {
-	int numOfAttributes, recordOption, i, keyIndex, type, size, schemaOption, end;
-	char isPK = '\0';
-	char name[BUFSIZ],buf[BUFSIZ];
-   
-   Record *record;
-   recordOption = 0;
+	//printf("\n Enter name of table to be created:\t");
+	//scanf("%s",&tableName);
 	
-	START_RECORD:
-	while(recordOption!=4)
+	table = (RM_TableData *) malloc(sizeof(RM_TableData));
+	
+	status = initRecordManager(NULL);
+	if(status != RC_OK)
 	{
-		//printf("\n Choose operation to be performed for records:\n 1. Insert Single Record.\n 2. Insert Multiple Records.\n 3. View Records.\n 4. Exit Record Operations: \t");
-		printf("\n Choose operation to be performed for records:\n 1. Insert Single Record.\n 2. View Record.\n 3. Exit Record Operations: \t");
-		fflush(stdout);
-		while (fgets(buf, sizeof buf, stdin) == NULL || sscanf(buf, "%d%n", &recordOption, &end) != 1 || !isspace(buf[end]))
+		printf("\n Error in initializing record manager.\n Aborting program.\n");
+		exit(0);
+	}
+	
+	status = createTable("testTable",schema);
+	if(status != RC_OK)
+	{
+		printf("\n Error in creating table.\n Aborting program.\n");
+		exit(0);
+	}
+}
+
+void tableOperations()
+{
+	int tableOption, end;
+	char buf[BUFSIZ];
+	
+	tableOption = 0;
+	
+	while(tableOption != 6)
+	{		
+		printf("\n########################################################");
+		printf("\n Choose operation to be performed on table: \n");
+		printf("\n########################################################");
+		printf("\n 1. Insert records in table");
+		printf("\n 2. Update record in table");
+		printf("\n 3. Delete record from table");
+		printf("\n 4. View records in table");
+		printf("\n 5. Delete table");
+		printf("\n 6. Exit program: \t");
+		
+		while (fgets(buf, sizeof buf, stdin) == NULL || sscanf(buf, "%d%n", &tableOption, &end) != 1 || !isspace(buf[end]))
 		{
-			//printf("\n Invalid integer.\n Please try again: ");
+			//printf("\n Invalid integer.\n Please try again: \t");
 			fflush(stdout);
 		}
 		
-		if(recordOption == 1)
-		{	
-			printf("\n--------------------------------------------------------");
-			printf("\n Creating Single Record:");
-			printf("\n--------------------------------------------------------");
-			
-			record = createSingleRecord(schema);
-		}
-		else if(recordOption == 2)
+		switch (tableOption)
 		{
-			printf("\n--------------------------------------------------------");
-			printf("\n Record In Schema Is:");
-			printf("\n--------------------------------------------------------");
-			
-			viewRecords(schema, record);
-		}
-		else if(recordOption == 3)
-		{
-			return RC_OK;
-		}
-		else 
-		{
-			printf("\n Invalid option.\n");
-			goto START_RECORD;
+			case 1:
+			{
+				insertRecordsTest();
+				break;
+			}
+			case 2:
+			{
+				updateRecordTest();
+				break;
+			}
+			case 3:
+			{
+				deleteRecordTest();
+				break;
+			}
+			case 4:
+			{
+				viewRecordTest();
+				break;
+			}
+			case 5:
+			{
+				deleteTableTest();
+				break;
+			}
+			case 6:
+			{
+				status = shutdownRecordManager();
+				if(status != RC_OK)
+				{
+					printf("\n Error in shutting record manager.\n Aborting program.\n");
+					exit(0);
+				}
+
+				free(rids);
+				free(table);
+				freeSchema(schema);
+				
+				printf("\n Exiting program execution successfully.");
+				printf("\n########################################################\n");
+				exit(0);
+			}
+			default:
+			{
+				printf("\n Incorrect input. Please try again.");
+				break;
+			}
 		}
 	}
-	
-	return RC_OK;
 }
 
-Record* createSingleRecord(Schema *schema)
+void insertRecordsTest()
+{
+	int i, end, numOfRecords;
+	char buf[BUFSIZ];
+   
+   Record *record;
+   numOfRecords = 0;
+	
+	printf("\n Enter number of records to be inserted : \t");
+	fflush(stdout);
+	while (fgets(buf, sizeof buf, stdin) == NULL || sscanf(buf, "%d%n", &numOfRecords, &end) != 1 || !isspace(buf[end]))
+	{
+			//printf("\n Invalid integer.\n Please try again: ");
+			fflush(stdout);
+	}
+		
+	rids = (RID *) malloc(sizeof(RID) * (numOfRecords+totalRecordsInTable));
+		
+	status = openTable(table, "test_table_t");
+	if(status != RC_OK)
+	{
+		printf("\n Error in opening table.\n Aborting program.\n");
+		exit(0);
+	}
+	
+	for(i=totalRecordsInTable; i<(numOfRecords+totalRecordsInTable); i++)
+	{
+		record = createSingleRecord();
+		status = insertRecord(table,record);
+		if(status != RC_OK)
+		{
+			printf("\n Error in inserting record in table.\n Aborting program.\n");
+			exit(0);
+		}
+		rids[i] = record->id;
+		freeRecord(record);
+	}
+	
+	totalRecordsInTable+=numOfRecords;
+}
+
+Record* createSingleRecord()
 {
 	Record *result;
 	Value *value;
@@ -342,15 +409,141 @@ Record* createSingleRecord(Schema *schema)
 	return result;
 }
 
-Record* createMultipleRecords(Schema *schema)
+void updateRecordTest()
 {
+	DataType attrDataType;
+	int recordNo, totalAttrs, attrNum, i;
+	char *attrName, *attrNameSchema;
+	auto newValue;
+	Record *record;
+	Value *value;
+	
+	recordNo = attrNum = 0;
+	totalAttrs = schema->numAttr;
+	
+	printf("\n Enter record number to be updated:\t");
+	scanf("%d",&recordNo);
+	
+	printf("\n Enter name of attribute to be updated:\t");
+	scanf("%s",&attrName);
+
+	for(i=0; i<totalAttrs; i++)
+	{
+		attrNameSchema = schema->attrNames[i];
+		if(!strcmp(attrNameSchema,attrName))
+		{
+			attrNum = i+1;
+			break;
+		}
+	}
+	
+	attrDataType = schema->dataTypes[attrNum];
+	
+	printf("\n Enter value to be replaced: \t");
+	switch(attrDataType)
+	{
+		case DT_STRING:
+			printf("\n Enter string of max length %d: \t",schema->typeLength[attrNum]);
+			scanf("%s",&newValue);
+			break;
+		case DT_INT:
+			scanf("%d",&newValue);
+			break;
+		case DT_FLOAT:
+			scanf("%f",&newValue);
+			break;
+		case DT_BOOL:
+			printf("\n Enter 1 (true) or 0 (false):\t");
+			scanf("%d",&newValue);
+			break;
+	}
+	
+	if(attrDataType == DT_STRING)
+	{
+		MAKE_STRING_VALUE(value, newValue);
+		value->v.stringV[strlen(newValue)-1] = '\0';
+	}
+	else
+	{
+		MAKE_VALUE(value, attrDataType, newValue);
+	}
+
+	status = getRecord(table, rids[recordNo], record);	
+	if(status != RC_OK)
+	{
+		printf("\n Error in getting record from table.\n Aborting program.\n");
+		exit(0);
+	}	
+	
+	status = setAttr (record, schema, attrNum, value);
+	if(status != RC_OK)
+	{
+		printf("\n Error in updating attribute of record in table.\n Aborting program.\n");
+		exit(0);
+	}
+	
+	record->id = rids[recordNo];
+	status = updateRecord(table,record);
+	if(status != RC_OK)
+	{
+		printf("\n Error in updating record in table.\n Aborting program.\n");
+		exit(0);
+	}
 }
 
-void viewRecords(Schema *schema, Record *record)
+void deleteRecordTest()
 {
-	char *recodsDetails = serializeRecord(record, schema);
+	int numOfRecords, i, recordNum;
+	
+	numOfRecords = recordNum = i = 0;
+	
+	printf("\n Enter total number of records to be deleted: \t");
+	scanf("%d",&numOfRecords);
+	
+	for(i=0; i<numOfRecords; i++)
+	{
+		printf("\n %d. Enter number of record to be deleted: \t",i+1);
+		scanf("%d",&recordNum);
+		status = deleteRecord(table,rids[recordNum-1]);
+		if(status != RC_OK)
+		{
+			printf("\n Error in deleting record from table.\n Aborting program.\n");
+			exit(0);
+		}
+	}
+	
+	printf("\n Record/s deleted successfully");
+}
+
+void viewRecordTest()
+{
+	int i;
+	Record *record;
+	char *recordDetails;
 
 	printf("\n########################################################");
-	printf("\n RECORD DETAILS : \n %s",recodsDetails);
+	printf("\n RECORDS IN TABLE ARE : ");
 	printf("\n########################################################");	
+	
+	for(i=0; i < totalRecordsInTable ;i++)
+	{
+		status = getRecord(table, rids[0], record);
+		if(status != RC_OK)
+		{
+			printf("\n Error in fetching record from table.\n Aborting program.\n");
+			exit(0);
+		}
+		recordDetails = serializeRecord(record, schema);
+		printf("\n %d)  %s",i+1,recordDetails);
+	}
+}
+
+void deleteTableTest()
+{
+	status = deleteTable(tableName);
+	if(status != RC_OK)
+	{
+		printf("\n Error in deleting table.\n Aborting program.\n");
+		exit(0);
+	}
 }

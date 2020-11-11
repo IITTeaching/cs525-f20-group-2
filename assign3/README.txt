@@ -141,8 +141,12 @@ make run_test1 - It executes test_assign3_1. Output of execution will be redirec
 ------------------------ ADDITIONAL IMPLEMENTATION INCLUDES ---------------------------
 This will start the menu driven testing. For now this includes only:
 	a. Creation of schema.
-	b. Creation of record.
-	c. View record.
+	b. Creation of table
+	c. Insertion of record in table
+	d. Deletion of record in table
+	e. Update record in table
+	f. Delete table
+	g. View records -> in progress
 
 ------------------- DETAILS OF GENERIC FUNCTIONS IMPLEMENTATION -----------------------
 Below are the functions defined in record_mgr.c.
@@ -153,7 +157,7 @@ These functions create a record manager for a file on the disk.
 The buffer manager and storage manager from the first and second assignment will be used for managing page files and buffer pools.
 
 /*-------------------------- Dealing with schemas -----------------------*/
->>>>>>> c1deaebe019dc368056670e6a0d0c66ab270eccc
+
 1. getRecordSize
 		- This function will calculate size of record based on schema data (number of attributes, data types and sizes)
 2. createSchema
