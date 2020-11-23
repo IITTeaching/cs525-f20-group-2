@@ -1,8 +1,12 @@
 #ifndef BTREE_MGR_H
 #define BTREE_MGR_H
 
+#include "stdio.h"
+#include "stdlib.h"
 #include "dberror.h"
 #include "tables.h"
+#include "storage_mgr.h"
+#include "buffer_mgr.h"
 
 // structure for accessing btrees
 typedef struct BTreeHandle {
