@@ -54,7 +54,7 @@ extern RC initIndexManager (void *mgmtData)
 		initialize global variables if any required
 	*/
 	
-	initStorageManager();
+	(mgmtData != NULL) ? -1 : initStorageManager();
 	bufferPool = (BM_BufferPool *) malloc(sizeof(BM_BufferPool));
 	return RC_OK;
 }
@@ -69,7 +69,10 @@ extern RC shutdownIndexManager ()
 		
 		free all allocated spaces
 	*/
-	
+	if(treeManager != NULL) {
+		treeManager = NULL;
+		free(treeManager);
+	}
 	return RC_OK;
 }
 
@@ -260,8 +263,8 @@ extern RC getNumNodes (BTreeHandle *tree, int *result)
 
 	if(tree == NULL)
 	{
-		printf("\n TREE NOT PRESENT\n");
-		return 0; // ADD ERROR CODE HERE
+		//printf("\n TREE NOT PRESENT\n");
+		return RC_ERROR; 
 	}
 	else
 	{
@@ -285,12 +288,22 @@ extern RC getNumEntries (BTreeHandle *tree, int *result)
 		Return number of entries in B+ tree
 	*/
 	
-	int numOfEntries = 0;
-	btManager *treeManager = (btManager *) tree->mgmtData;
+	//int numOfEntries = 0;
+	//btManager *treeManager = (btManager *) tree->mgmtData;
 
 	// count of keys in treeManager->keys
 
-	*result = numOfEntries;
+	if(tree == NULL) 
+	{
+		return RC_ERROR;
+	}
+	
+	if(tree->recordSize == -1) 
+	{
+		return RC_ERROR;
+	}
+
+	*result = tree->recordSize;
 	return RC_OK;
 }
 
@@ -300,7 +313,14 @@ extern RC getKeyType (BTreeHandle *tree, DataType *result)
 	/*
 		Return type of key in B+ tree
 	*/
-
+	if (tree == NULL) {
+		return RC_ERROR;
+	}
+	
+	if (tree->keyType == NULL) {
+		return RC_ERROR;
+	}
+	
 	*result = tree->keyType;
 	return RC_OK;
 }
