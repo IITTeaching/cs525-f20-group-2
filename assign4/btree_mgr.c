@@ -80,7 +80,8 @@ bPlusTreeRecord *createNewRecord()
 	newRecord->prevRecord = NULL;
 	newRecord->lChild = NULL;
 	newRecord->rChild = NULL;
-	newRecord->key = NULL;
+	newRecord->key = (Value *) malloc(sizeof(Value));
+	newRecord->key->v.intV = 0;
 	newRecord->recordID.slot = 0;
 	newRecord->recordID.page = 0;
 
@@ -195,7 +196,6 @@ extern RC openBtree (BTreeHandle **tree, char *idxId)
 	*tree = (BTreeHandle *) malloc(sizeof(BTreeHandle));
 		printf("\n INSIDE openBtree - after malloc");
 	(*tree) = treeHandle;
-	//(*tree)->mgmtData = treeManager;
 		printf("\n INSIDE openBtree - after setting mgmtData");
 	
 			printf("\n INSIDE openBtree - before openPageFile");
@@ -316,15 +316,17 @@ extern RC findKey (BTreeHandle *tree, Value *key, RID *result)
 		printf("\n INSIDE findKey ");
 	int recordFound = 0;
 	// Retrieve B+ Tree's metadata information.
-	btManager *treeManager = (btManager *) tree->mgmtData;
+	//btManager *treeMgr = (btManager *) tree->mgmtData;
 	bPlusTreeRecordList *recordList;
 	bPlusTreeRecord *record;
 
-	bPlusTreeNode *node  = (bPlusTreeNode *) treeManager->tree;
+	//bPlusTreeNode *node  = (bPlusTreeNode *) treeMgr->tree;
+	bPlusTreeNode *node = root;
 			printf("\n INSIDE findKey - afer setting node ");
-	while(node->nextNode != NULL || recordFound == 0)
+			printf("\n node->nextNode = <%d>",node->nextNode);
+	while(node != NULL)
 	{
-				printf("\n INSIDE findKey - inside while for node");
+				printf("\n 1 INSIDE findKey - inside while for node");
 		//if(node->isLeaf == 1)
 		//{
 		
@@ -332,14 +334,15 @@ extern RC findKey (BTreeHandle *tree, Value *key, RID *result)
 			record = recordList->start;
 			while(record->nextRecord != NULL)
 			{
-							printf("\n INSIDE findKey - inside while for record ");
-							printf("\n INSIDE findKey - key->v.intV = <%d>", key->v.intV );
+							printf("\n 2 INSIDE findKey - inside while for record ");
+							printf("\n 3 INSIDE findKey - key->v.intV = <%d>", key->v.intV );
+							printf("\n 4 INSIDE findKey - record->key->v.intV = <%d>", record->key->v.intV );
 							printf("\n ###################################################### ");
-								printf("\n ###################################################### ");
-									printf("\n ###################################################### ");
+							printf("\n ###################################################### ");
+							printf("\n ###################################################### ");
 				if(key->v.intV == record->key->v.intV)
 				{
-								printf("\n INSIDE findKey - match found");
+					printf("\n INSIDE findKey - match found");
 					*result = record->recordID;
 					recordFound = 1;
 					break;
@@ -379,10 +382,16 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 	
 	
 	printf("\n INSIDE insertKey ");
+	printf("\n----------------------");
+	tree = treeHandle;
 	// Retrieve B+ Tree's metadata information.
-	btManager *treeManager = (btManager *) tree->mgmtData;
+	btManager *treeMgr = (btManager *) tree->mgmtData;
+
+	printf("\n----------------------");
 	bPlusTreeRecordList *recordList;
+	printf("\n----------------------");
 	bPlusTreeRecord *record1, *record2;
+	printf("\n----------------------");
 	RID *resultRid;
 	int value1, value2, result;
 	BM_PageHandle *page = (BM_PageHandle *) malloc(sizeof(BM_PageHandle));
@@ -390,17 +399,17 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 	bPlusTreeNode *rightNode = (bPlusTreeNode *) malloc(sizeof(bPlusTreeNode));
 	
 	
-	printf("\n INSIDE insertKey - bTreeOrder = <%d>",treeManager->tree->order);
+	//printf("\n INSIDE insertKey - bTreeOrder = <%d>",treeMgr->tree->order);
 		printf("\n INSIDE insertKey - after all mallocs");
 	resultRid->page = rid.page;
 	resultRid->slot = rid.slot;
 
 		printf("\n INSIDE insertKey - rid.page = <%d>",rid.page);
 		printf("\n INSIDE insertKey - rid.slot = <%d>",rid.slot);
-	int bTreeOrder = treeManager->tree->order;
+	//int bTreeOrder = treeMgr->tree->order;
 	result = value1 = value2 = 0;
 	
-			printf("\n INSIDE insertKey - bTreeOrder = <%d>",bTreeOrder);
+			//printf("\n INSIDE insertKey - bTreeOrder = <%d>",bTreeOrder);
 
 	// If the tree doesn't exist yet, return error saying trying to insert in non-existing tree
 	if (root == NULL) {
@@ -414,7 +423,7 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 	// Check if record with the specified key already exists.
 	if(node->numKeys != 0)
 	{
-		if (findKey(tree, key, resultRid) != NULL) {
+		if (findKey(tree, key, resultRid) == RC_OK) {
 			printf("\n insertKey - key already exists");
 			return RC_IM_KEY_ALREADY_EXISTS;
 		}
@@ -454,12 +463,21 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 			}
 			
 			printf("\n 3 page->data = <%s>",page->data);		
-			record1->key = stringToValue(page->data);
+			//printf("\n 4 page->data = <%d>",atoi(page->data));
+			printf("\n###############################################");
+			printf("\n###############################################");	
+			//record1->key->dt = DT_INT;
+			//record1->key = page->data;
+			//record1->key->v.intV = atoi(page->data);
+			//record1->key = stringToValue(page->data);
+			//record1->recordID = rid;
+			//record1->key = stringToValue(page->data);
 			record1->recordID = rid;
-			
+			//printf("\n record1->key->dt = <%d>",record1->key->dt);
 			//printf("\n record1->key->v.intV = <%d>",record1->key->v.intV);
 			printf("\n record1->recordID.page = <%d>, record1->recordID.slot = <%d>",record1->recordID.page,record1->recordID.slot);
 			
+			printf("\n###############################################");	
 			node->numKeys = 1;
 			node->nodeNum = 1;
 			globalNodeNum = 1;
@@ -488,6 +506,7 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 				return result;
 			}
 			
+			printf("\n NOW CREATING LEFT AND RIGHT CHILDREN\n");
 			// Once record is added in tree, create left and right children (nodes) for the record
 			leftNode = createNewBTNode(tree,record1);
 			rightNode = createNewBTNode(tree,record1);
@@ -496,7 +515,7 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 			
 			record1->lChild = leftNode->recordList->start;
 			record1->rChild = rightNode->recordList->start;
-			
+			printf("\n SUCCESSFULLY COMPLETED CREATING LEFT AND RIGHT CHILDREN\n");
 			free(page);
 			result = RC_OK;
 		}
@@ -695,9 +714,7 @@ extern RC openTreeScan (BTreeHandle *tree, BT_ScanHandle **handle)
 	/* BORIS BT_ScanHandle *sc;
 	RID rid;
 	int rc;
-
 	startTreeScan(btree, sc, NULL);
-
 	while((rc = nextEntry(sc, &rid)) == RC_OK)
 	{
     	// do something with rid
@@ -716,7 +733,6 @@ extern RC openTreeScan (BTreeHandle *tree, BT_ScanHandle **handle)
 	//*handle = malloc(sizeof(BT_ScanHandle));
 
 	/*Node * node = treeManager->root;
-
 	if (treeManager->root == NULL) {
 		//printf("Empty tree.\n");
 		return RC_NO_RECORDS_TO_SCAN;
@@ -724,7 +740,6 @@ extern RC openTreeScan (BTreeHandle *tree, BT_ScanHandle **handle)
 		//printf("\n openTreeScan() ......... Inside ELse  ");
 		while (!node->is_leaf)
 			node = node->pointers[0];
-
 		// Initializing (setting) the Scan's metadata information.
 		scanmeta->keyIndex = 0;
 		scanmeta->totalKeys = node->num_keys;
@@ -746,21 +761,17 @@ extern RC nextEntry (BT_ScanHandle *handle, RID *result)
 	//printf("\n INSIDE nextEntry()...... ");
 	// Retrieve B+ Tree Scan's metadata information.
 /*	ScanManager * scanmeta = (ScanManager *) handle->mgmtData;
-
 	// Retrieving all the information.
 	int keyIndex = scanmeta->keyIndex;
 	int totalKeys = scanmeta->totalKeys;
 	int bTreeOrder = scanmeta->order;
 	RID rid;
-
 	//printf("\n keyIndex = %d, totalKeys = %d ", keyIndex, totalKeys);
 	Node * node = scanmeta->node;
-
 	// Return error if current node is empty i.e. NULL
 	if (node == NULL) {
 		return RC_IM_NO_MORE_ENTRIES;
 	}
-
 	if (keyIndex < totalKeys) {
 		// If current key entry is present on the same leaf node.
 		rid = ((NodeData *) node->pointers[keyIndex])->rid;
