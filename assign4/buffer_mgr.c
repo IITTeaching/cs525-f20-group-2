@@ -261,7 +261,6 @@ RC pinPage_LRU (BM_BufferPool *const bm, BM_PageHandle *const page,const PageNum
 
 RC pinPage_CLOCK (BM_BufferPool *const bm, BM_PageHandle *const page,const PageNumber pageNum)
 {
-	printf("\n inside pinPage_CLOCK");
 		RC result;
 		int status, totalPagesInBuffer;
 		bpInfo *mgmtInfo = (bpInfo *)bm->mgmtData;
@@ -270,11 +269,10 @@ RC pinPage_CLOCK (BM_BufferPool *const bm, BM_PageHandle *const page,const PageN
 		/* Set name of file to be written to */
 		fh.fileName = bm->pageFile;
 		char pageData[strlen(page->data)];
-
 		strcpy(pageData,page->data);
 
 		if ((status = openPageFile ((char *)(bm->pageFile), &fh)) != RC_OK){return status;}
-		strcpy(page->data,pageData);
+		//strcpy(page->data,pageData);
 		/*
 			Set currentClockNode to head of list on start of process
 			Set firstTimeIndicator = 1 on start of process
@@ -335,20 +333,28 @@ RC pinPage_CLOCK (BM_BufferPool *const bm, BM_PageHandle *const page,const PageN
 					(mgmtInfo->numWrites)++;
 				}
 
-				currentClockNode->data = page->data;
+	printf("\n inside pinPage_CLOCK - pageData = <%s>",pageData);
+				//currentClockNode->data = page->data;
+				currentClockNode->data = pageData;
 				currentClockNode->pageNum = pageNum;
 				currentClockNode->dirtyBit = false;
 				currentClockNode->fixCount = 0;
-
+	printf("\n inside pinPage_CLOCK - currentClockNode->data = <%s>",currentClockNode->data);
+printf("\n inside pinPage_CLOCK - page->data = <%s>",page->data);
 				if((status = readBlock(pageNum, &fh, currentClockNode->data)) != RC_OK) {return status;}
 
 				page->pageNum = pageNum;
 				page->data = currentClockNode->data;
-
+				printf("\n inside pinPage_CLOCK - page->data = <%s>",page->data);
+				printf("\n inside pinPage_CLOCK - currentClockNode->data = <%s>",currentClockNode->data);
+currentClockNode->data = pageData;
+printf("\n inside pinPage_CLOCK - currentClockNode->data = <%s>",currentClockNode->data);
 				(mgmtInfo->numReads)++;
 				currentClockNode = currentClockNode->next == NULL ? mgmtInfo->framelist->head : currentClockNode->next;
 				result = RC_OK;
+printf("\n inside pinPage_CLOCK - page->data = <%s>",page->data);
 				closePageFile(&fh);
+				printf("\n inside pinPage_CLOCK - page->data = <%s>",page->data);
 				break;
 			}
 			else
@@ -440,24 +446,19 @@ RC shutdownBufferPool(BM_BufferPool *const bm)
 
 RC forceFlushPool(BM_BufferPool *const bm)
 {
-	printf("\n INSIDE forceFlushPool ");
     SM_FileHandle fh;
-    if (!bm || bm->numPages <= 0){ printf("\n INSIDE forceFlushPool - numPages <=0 "); return RC_INVALID_BM; }
+    if (!bm || bm->numPages <= 0){  return RC_INVALID_BM; }
 
     bpInfo *bufferpool = (bpInfo *)bm->mgmtData;
     pageFrame *currentNode = bufferpool->framelist->head;
 
     if (openPageFile ((char *)(bm->pageFile), &fh) != RC_OK){
-    	printf("\n INSIDE forceFlushPool - openPageFile failed");
         return RC_FILE_NOT_FOUND;
     }
 
-printf("\n INSIDE forceFlushPool - after opening page file successfully");
     while(currentNode != NULL){
         if(currentNode->dirtyBit == 1){
-        	printf("\n inside the while loop - before writeBlock");
             if(writeBlock(currentNode->pageNum, &fh, currentNode->data) != RC_OK){
-            	printf("\n inside the while loop - writeBlock failed");
                 return RC_WRITE_FAILED;
             }
             currentNode->dirtyBit = 0;
