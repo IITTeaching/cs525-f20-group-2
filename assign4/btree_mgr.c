@@ -252,7 +252,7 @@ extern RC findKey (BTreeHandle *tree, Value *key, RID *result)
 				break;
 			}
 		}
-		treeNode=treeNode->next[order];
+		treeNode=treeNode->next[0];
 	}
 	
    if(recordFound == 0)
@@ -305,7 +305,7 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 	int i, j, pos, setLeftNode, setRightNode, value1, value2, result, splitIndex, midValue;
 	bPlusTreeNode *temp = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
 	bPlusTreeNode *newNode = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
-	bPlusTreeNode *existingNode, *newLNode, *newRNode, *newRoot, *tempArr;
+	bPlusTreeNode *existingNode, *newLNode, *newRNode, *newRoot, *tempArr, *temp1;
 	
 	i = j = pos = setLeftNode = setRightNode = value1 = value2 = midValue = 0;
 	result = 1;
@@ -507,69 +507,216 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 				printf("-- <%d> -- \t", temp->Key[i]);
 				if(key->v.intV < temp->Key[i])
 				{
-					printf("\n going to left child");
+					printf("\n 1 going to left child");
 					existingNode=temp->lchild[0];
+
+					// check if existing node has space or not
+					result = isNodeFull(existingNode);
+					if(result == 1)
+					{
+						temp1 = existingNode;
+
+						printf("\n 4 existing node is not full so adding to existing node");
+						for(i = 0; i < order ; i++)
+						{	
+							printf("-- <%d> -- \t", temp1->Key[i]);
+							if(temp1->Key[i] != 0)
+							{
+								if(key->v.intV < temp1->Key[i])
+								{
+									pos = 0;
+									printf("\n position = <%d>",pos);
+									break;
+								}
+								if((temp1->Key[i] < key->v.intV) && (temp1->Key[i+1] > key->v.intV))
+								{	
+									pos = i+1;
+									printf("\n position = <%d>",pos);
+									break;
+								}
+								if(key->v.intV > temp1->Key[order] && (i==order-1))
+								{
+									pos = order;
+									printf("\n position = <%d>",pos);
+									break;
+								}
+							}
+							else
+							{
+								pos = i;
+							}
+						}
+				
+						// Move existing data to right side of the array
+						for(i = (order-1); i >= pos; i--)
+						{
+							temp1->Key[i]= temp1->Key[i-1];
+							temp1->recordID[i].page= temp1->recordID[i-1].page;
+							temp1->recordID[i].slot= temp1->recordID[i-1].slot;
+							temp1->next[i]= temp1->next[i-1];
+							temp1->lchild[i]= temp1->lchild[i-1];
+							temp1->rchild[i]= temp1->rchild[i-1];						
+						}
+      
+  			   		// Add new key and RID value in correct position
+						temp1->recordID[pos].page = rid.page;
+						temp1->recordID[pos].slot = rid.slot;
+						temp1->Key[pos] = key->v.intV;
+						temp1->next[pos] = NULL;
+						temp1->lchild[pos] = temp1->rchild[pos-1];
+						temp1->rchild[pos] = NULL;
+						
+						existingNode = temp1;
+						temp->lchild[0] = existingNode;
+						root = temp;
+					}			
+					else //split the child node
+					{
+					}
 					break;
 				}
 				if((temp->Key[i] < key->v.intV) && (temp->Key[i+1] > key->v.intV))
 				{
-					printf("\n going to right child");
-					existingNode=temp->rchild[0];
+					printf("\n 2 going to right child");
+					existingNode=temp->rchild[0];					
+
+					// check if existing node has space or not
+					result = isNodeFull(existingNode);
+					if(result == 1)
+					{
+						temp1 = existingNode;
+
+						printf("\n 4 existing node is not full so adding to existing node");
+						for(i = 0; i < order ; i++)
+						{	
+							printf("-- <%d> -- \t", temp1->Key[i]);
+							if(temp1->Key[i] != 0)
+							{
+								if(key->v.intV < temp1->Key[i])
+								{
+									pos = 0;
+									printf("\n position = <%d>",pos);
+									break;
+								}
+								if((temp1->Key[i] < key->v.intV) && (temp1->Key[i+1] > key->v.intV))
+								{	
+									pos = i+1;
+									printf("\n position = <%d>",pos);
+									break;
+								}
+								if(key->v.intV > temp1->Key[order] && (i==order-1))
+								{
+									pos = order;
+									printf("\n position = <%d>",pos);
+									break;
+								}
+							}
+							else
+							{
+								pos = i;
+							}
+						}
+				
+						// Move existing data to right side of the array
+						for(i = (order-1); i >= pos; i--)
+						{
+							temp1->Key[i]= temp1->Key[i-1];
+							temp1->recordID[i].page= temp1->recordID[i-1].page;
+							temp1->recordID[i].slot= temp1->recordID[i-1].slot;
+							temp1->next[i]= temp1->next[i-1];
+							temp1->lchild[i]= temp1->lchild[i-1];
+							temp1->rchild[i]= temp1->rchild[i-1];						
+						}
+      
+  			   		// Add new key and RID value in correct position
+						temp1->recordID[pos].page = rid.page;
+						temp1->recordID[pos].slot = rid.slot;
+						temp1->Key[pos] = key->v.intV;
+						temp1->next[pos] = NULL;
+						temp1->lchild[pos] = temp1->rchild[pos-1];
+						temp1->rchild[pos] = NULL;
+						
+						existingNode = temp1;
+						temp->rchild[0] = existingNode;
+						root = temp;
+					}
+					else //split the child node
+					{
+					}
+					
 					break;
 				}
 				if(key->v.intV > temp->Key[order])
 				{
-					printf("\n going to right child");
+					printf("\n 3 going to right child");
 					existingNode=temp->rchild[0];
+			
+					// check if existing node has space or not
+					result = isNodeFull(existingNode);
+					if(result == 1)
+					{
+						temp1 = existingNode;
+
+						printf("\n 4 existing node is not full so adding to existing node");
+						for(i = 0; i < order ; i++)
+						{	
+							printf("-- <%d> -- \t", temp1->Key[i]);
+							if(temp1->Key[i] != 0)
+							{
+								if(key->v.intV < temp1->Key[i])
+								{
+									pos = 0;
+									printf("\n position = <%d>",pos);
+									break;
+								}
+								if((temp1->Key[i] < key->v.intV) && (temp1->Key[i+1] > key->v.intV))
+								{	
+									pos = i+1;
+									printf("\n position = <%d>",pos);
+									break;
+								}
+								if(key->v.intV > temp1->Key[order] && (i==order-1))
+								{
+									pos = order;
+									printf("\n position = <%d>",pos);
+									break;
+								}
+							}
+							else
+							{
+								pos = i;
+							}
+						}
+				
+						// Move existing data to right side of the array
+						for(i = (order-1); i >= pos; i--)
+						{
+							temp1->Key[i]= temp1->Key[i-1];
+							temp1->recordID[i].page= temp1->recordID[i-1].page;
+							temp1->recordID[i].slot= temp1->recordID[i-1].slot;
+							temp1->next[i]= temp1->next[i-1];
+							temp1->lchild[i]= temp1->lchild[i-1];
+							temp1->rchild[i]= temp1->rchild[i-1];						
+						}
+      
+  			   		// Add new key and RID value in correct position
+						temp1->recordID[pos].page = rid.page;
+						temp1->recordID[pos].slot = rid.slot;
+						temp1->Key[pos] = key->v.intV;
+						temp1->next[pos] = NULL;
+						temp1->lchild[pos] = temp1->rchild[pos-1];
+						temp1->rchild[pos] = NULL;
+						
+						existingNode = temp1;
+						temp->rchild[0] = existingNode;
+						root = temp;
+					}
+					else //split the child node
+					{
+					}
+
 					break;
 				}
-			}
-			
-			// check if existing node has space or not
-			result = isNodeFull(existingNode);
-			if(result == 1)
-			{
-				temp = existingNode;
-
-				printf("\n 4 existing node is not full so adding to existing node");
-				for(i = 0; i < order ; i++)
-				{	
-					printf("-- <%d> -- \t", temp->Key[i]);
-					if(key->v.intV < temp->Key[i])
-					{
-						pos = 0;
-						break;
-					}
-					if((temp->Key[i] < key->v.intV) && (temp->Key[i+1] > key->v.intV))
-					{
-						pos = i+1;
-						break;
-					}
-					if(key->v.intV > temp->Key[order])
-					{
-						pos = order;
-						break;
-					}
-				}					
-				
-				// Move existing data to right side of the array
-				for(i = (order-1); i >= pos; i--)
-				{
-					temp->Key[i]= temp->Key[i-1];
-					temp->recordID[i].page= temp->recordID[i-1].page;
-					temp->recordID[i].slot= temp->recordID[i-1].slot;
-					temp->next[i]= temp->next[i-1];
-					temp->lchild[i]= temp->lchild[i-1];
-					temp->rchild[i]= temp->rchild[i-1];
-				}
-      
-  			   // Add new key and RID value in correct position
-				temp->recordID[pos].page = rid.page;
-				temp->recordID[pos].slot = rid.slot;
-				temp->Key[pos] = key->v.intV;
-				temp->next[pos] = NULL;
-				temp->lchild[pos] = temp->rchild[pos-1];
-				temp->rchild[pos] = NULL;
 			}
 		}
 	}		
