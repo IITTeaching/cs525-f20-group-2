@@ -184,7 +184,7 @@ extern RC getNumNodes (BTreeHandle *tree, int *result)
 		Return number of nodes in B+ tree
 	*/
 		
-	int totalNodes = 1;
+	int totalNodes = 0;
 	bPlusTreeNode *temp = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
 	
 	temp = root;
@@ -233,21 +233,21 @@ extern RC findKey (BTreeHandle *tree, Value *key, RID *result)
 		3. If key not found, return RC_IM_KEY_NOT_FOUND
 	*/
 	
-	int recordFound, nodeKey, nodeRID, i;
+	int recordFound, nodeKey, nodeRID;
 	
 	bPlusTreeNode *treeNode = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
 	treeNode = root;
 	
-	recordFound = nodeKey = nodeRID = i = 0;
+	recordFound = nodeKey = nodeRID = 0;
 
 	while(treeNode!=NULL)
 	{
 		for(nodeKey=0; nodeKey<order; nodeKey++)
 		{
-			if (treeNode->Key[i] == key->v.intV)
+			if (treeNode->Key[nodeKey] == key->v.intV)
 			{
-				(*result).page = treeNode->recordID[i].page;
-				(*result).slot = treeNode->recordID[i].slot;
+				(*result).page = treeNode->recordID[nodeKey].page;
+				(*result).slot = treeNode->recordID[nodeKey].slot;
 				recordFound = 1;
 				break;
 			}
@@ -341,17 +341,14 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 		if(result == 1)
 		{
 			// Get position where we can add the new key
-			printf("\n 1 ");
 			for(i = 0; i < order ; i++)
 			{
-				printf("-- <%d> -- \t", temp->Key[i]);
 				if((key->v.intV > temp->Key[i]) && (temp->Key[i] != 0))
 				{
 					pos = i+1;
 					break;
 				}
 			}
-			printf("\n 1. ROOT IS EMPTY. So first here element will be created");
 			// Move existing data to right side of the array
    		for(i = order; i >= pos; i--)
 	   	{
@@ -393,7 +390,6 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 	}
 	else // root node is full so create left and right child nodes. or try to add to existing left/right node
 	{
-		printf("\n 2. ROOT IS FULL. SO NOW CHILD NODES WILL BE CREATED");
 		// if yes, then create go to left and right node if already created. else create left and right nodes.
 		// SO HERE IF NODEFULL IS 1 IT MEANS THERE WAS SPACE IN NODE TO ADD KEY.
 		// IF ITS 0 IT MEANS THE NODE WAS FULL
@@ -401,11 +397,8 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 		// IF NEXT NODE IS NULL THEN, ADD NEW NODE TO NEXT OF EXISTING NODE. AND SET NEXT OF NEW NODE TO NULL
 		temp = root;
 
-		printf("\n 2 ");
 		for(i = 0; i < order ; i++)
 		{
-			printf("-- i = %d, <%d> -- \t", i, temp->Key[i]);
-			
 			if(key->v.intV < temp->Key[i])
 			{
 				pos = 0;
@@ -499,15 +492,11 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 		}
 		else // check if there is place in existing nodes and add value
 		{
-			printf("\n As left and right child are existing, checking where we can insert key ");
 			temp = root;
-			printf("\n 3 ");
 			for(i = 0; i < order; i ++ )
 			{
-				printf("-- <%d> -- \t", temp->Key[i]);
 				if(key->v.intV < temp->Key[i])
 				{
-					printf("\n 1 going to left child");
 					existingNode=temp->lchild[0];
 
 					// check if existing node has space or not
@@ -516,28 +505,23 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 					{
 						temp1 = existingNode;
 
-						printf("\n 4 existing node is not full so adding to existing node");
 						for(i = 0; i < order ; i++)
 						{	
-							printf("-- <%d> -- \t", temp1->Key[i]);
 							if(temp1->Key[i] != 0)
 							{
 								if(key->v.intV < temp1->Key[i])
 								{
 									pos = 0;
-									printf("\n position = <%d>",pos);
 									break;
 								}
 								if((temp1->Key[i] < key->v.intV) && (temp1->Key[i+1] > key->v.intV))
 								{	
 									pos = i+1;
-									printf("\n position = <%d>",pos);
 									break;
 								}
 								if(key->v.intV > temp1->Key[order] && (i==order-1))
 								{
 									pos = order;
-									printf("\n position = <%d>",pos);
 									break;
 								}
 							}
@@ -569,15 +553,119 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 						existingNode = temp1;
 						temp->lchild[0] = existingNode;
 						root = temp;
-					}			
-					else //split the child node
-					{
 					}
-					break;
+					else // split the child node
+					{
+						newRoot = createNewBTNode(order);
+						newLNode = createNewBTNode(order);
+						newRNode = createNewBTNode(order);			
+						tempArr = createNewBTNode(order+1); // create new array with new key value as well
+						tempArr = existingNode; // set new array the value of node to be split
+
+						// Move existing data to right side of the array
+	   				for(i = (order-1); i >= pos; i--)
+   					{
+	      				tempArr->Key[i] = tempArr->Key[i-1];
+   	   				tempArr->recordID[i].page= tempArr->recordID[i-1].page;
+      					tempArr->recordID[i].slot= tempArr->recordID[i-1].slot;
+	      				tempArr->next[i]= tempArr->next[i-1];
+							tempArr->lchild[i]= tempArr->lchild[i-1];
+							tempArr->rchild[i]= tempArr->rchild[i-1];
+   	   			}	
+      		
+			      	// Add new key and RID value in correct position
+						tempArr->recordID[pos].page = rid.page;
+						tempArr->recordID[pos].slot = rid.slot;
+						tempArr->Key[pos] = key->v.intV;
+						tempArr->next[pos] = NULL;
+						tempArr->lchild[pos] = NULL;
+						tempArr->rchild[pos] = NULL;
+			
+						// split the new temporary array in left and right now based on splitIndex
+
+						midValue = order != 2 ? order - splitIndex : 2;
+			
+						// Add first half to left child
+						for(i = 0; i < midValue; i++)
+						{				
+							newLNode->recordID[i].page = tempArr->recordID[i].page;
+							newLNode->recordID[i].slot = tempArr->recordID[i].slot;
+							newLNode->Key[i] = tempArr->Key[i];
+							newLNode->next[i] = tempArr->next[i];
+							newLNode->lchild[i] = tempArr->lchild[i];
+							newLNode->rchild[i] = tempArr->rchild[i];
+						}
+			
+						// Add second half to right child
+						for(j=0,i = midValue; j < (midValue -1) ; j++,i++)
+						{
+							newRNode->recordID[j].page = tempArr->recordID[i].page;
+							newRNode->recordID[j].slot = tempArr->recordID[i].slot;
+							newRNode->Key[j] = tempArr->Key[i];
+							newRNode->next[j] = tempArr->next[i];
+							newRNode->lchild[j] = tempArr->lchild[i];
+							newRNode->rchild[j] = tempArr->rchild[i];
+						}
+
+						// Now as root is split, set new root values						
+						newRoot->recordID[0].page = newRNode->recordID[0].page;
+						newRoot->recordID[0].slot = newRNode->recordID[0].slot;
+						newRoot->Key[0] = newRNode->Key[0];
+						newRoot->next[0] = newLNode;
+						newRoot->lchild[0] = newLNode;
+						newRoot->rchild[0] = newRNode;														
+			
+						// Now as root is updated, change the next link of left/right children
+						newLNode->next[0] = newRNode;
+						newRNode->next[0] = NULL;		
+				
+						temp = root;
+						// clubbing both root nodes and realigning the links
+						result = isNodeFull(temp);
+						if(result == 1)
+						{
+							// Get position where we can add the new key
+							for(i = 0; i < order ; i++)
+							{
+								if((newRoot->Key[0] > temp->Key[i]) && (temp->Key[i] != 0))
+								{
+									pos = i+1;
+									break;
+								}
+							}
+							//printf("\n 1. ROOT IS EMPTY. So first here element will be created");
+							// Move existing data to right side of the array
+							for(i = order; i >= pos; i--)
+	  					 	{
+   					   	temp->Key[i]= temp->Key[i-1];
+    					  		temp->recordID[i].page= temp->recordID[i-1].page;
+    					  		temp->recordID[i].slot= temp->recordID[i-1].slot;
+ 					     		temp->next[i]= temp->next[i-1];
+  					    		temp->lchild[i]= temp->lchild[i-1];
+      						temp->rchild[i]= temp->rchild[i-1];     					      						
+							}
+      
+							// Add new key and RID value in correct position
+							temp->recordID[pos].page = newRoot->recordID[0].page;
+							temp->recordID[pos].slot = newRoot->recordID[0].slot;
+							temp->Key[pos] = newRoot->Key[0];
+							//temp->next[pos] = newRoot->next[0];
+							temp->lchild[pos] = newRoot->lchild[0];
+							temp->rchild[pos] = newRoot->rchild[0];	
+							temp->rchild[pos-1] = newRoot->lchild[0];			
+							temp->lchild[pos-1]->next[0] = newRoot->lchild[0];		
+							temp->lchild[pos]->next[0] = newRoot->rchild[0];		
+							temp->rchild[pos-1]->next[0] = newRoot->rchild[0];					
+							
+							root = temp;						
+							//free(temp);
+						}
+					}
+
+		  			break;
 				}
 				if((temp->Key[i] < key->v.intV) && (temp->Key[i+1] > key->v.intV))
 				{
-					printf("\n 2 going to right child");
 					existingNode=temp->rchild[0];					
 
 					// check if existing node has space or not
@@ -586,28 +674,23 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 					{
 						temp1 = existingNode;
 
-						printf("\n 4 existing node is not full so adding to existing node");
 						for(i = 0; i < order ; i++)
 						{	
-							printf("-- <%d> -- \t", temp1->Key[i]);
 							if(temp1->Key[i] != 0)
 							{
 								if(key->v.intV < temp1->Key[i])
 								{
 									pos = 0;
-									printf("\n position = <%d>",pos);
 									break;
 								}
 								if((temp1->Key[i] < key->v.intV) && (temp1->Key[i+1] > key->v.intV))
 								{	
 									pos = i+1;
-									printf("\n position = <%d>",pos);
 									break;
 								}
 								if(key->v.intV > temp1->Key[order] && (i==order-1))
 								{
 									pos = order;
-									printf("\n position = <%d>",pos);
 									break;
 								}
 							}
@@ -640,45 +723,149 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 						temp->rchild[0] = existingNode;
 						root = temp;
 					}
-					else //split the child node
+					else // split the child node
 					{
+						newRoot = createNewBTNode(order);
+						newLNode = createNewBTNode(order);
+						newRNode = createNewBTNode(order);			
+						tempArr = createNewBTNode(order+1); // create new array with new key value as well
+						tempArr = existingNode; // set new array the value of node to be split
+
+						// Move existing data to right side of the array
+	   				for(i = (order-1); i >= pos; i--)
+   					{
+	      				tempArr->Key[i] = tempArr->Key[i-1];
+   	   				tempArr->recordID[i].page= tempArr->recordID[i-1].page;
+      					tempArr->recordID[i].slot= tempArr->recordID[i-1].slot;
+	      				tempArr->next[i]= tempArr->next[i-1];
+							tempArr->lchild[i]= tempArr->lchild[i-1];
+							tempArr->rchild[i]= tempArr->rchild[i-1];
+   	   			}	
+      		
+			      	// Add new key and RID value in correct position
+						tempArr->recordID[pos].page = rid.page;
+						tempArr->recordID[pos].slot = rid.slot;
+						tempArr->Key[pos] = key->v.intV;
+						tempArr->next[pos] = NULL;
+						tempArr->lchild[pos] = NULL;
+						tempArr->rchild[pos] = NULL;
+			
+						// split the new temporary array in left and right now based on splitIndex
+
+						midValue = order != 2 ? order - splitIndex : 2;
+			
+						// Add first half to left child
+						for(i = 0; i < midValue; i++)
+						{				
+							newLNode->recordID[i].page = tempArr->recordID[i].page;
+							newLNode->recordID[i].slot = tempArr->recordID[i].slot;
+							newLNode->Key[i] = tempArr->Key[i];
+							newLNode->next[i] = tempArr->next[i];
+							newLNode->lchild[i] = tempArr->lchild[i];
+							newLNode->rchild[i] = tempArr->rchild[i];
+						}
+			
+						// Add second half to right child
+						for(j=0,i = midValue; j < (midValue -1) ; j++,i++)
+						{
+							newRNode->recordID[j].page = tempArr->recordID[i].page;
+							newRNode->recordID[j].slot = tempArr->recordID[i].slot;
+							newRNode->Key[j] = tempArr->Key[i];
+							newRNode->next[j] = tempArr->next[i];
+							newRNode->lchild[j] = tempArr->lchild[i];
+							newRNode->rchild[j] = tempArr->rchild[i];
+						}
+
+						// Now as root is split, set new root values						
+						newRoot->recordID[0].page = newRNode->recordID[0].page;
+						newRoot->recordID[0].slot = newRNode->recordID[0].slot;
+						newRoot->Key[0] = newRNode->Key[0];
+						newRoot->next[0] = newLNode;
+						newRoot->lchild[0] = newLNode;
+						newRoot->rchild[0] = newRNode;														
+			
+						// Now as root is updated, change the next link of left/right children
+						newLNode->next[0] = newRNode;
+						newRNode->next[0] = NULL;		
+				
+						temp = root;
+						// clubbing both root nodes and realigning the links
+						result = isNodeFull(temp);
+						if(result == 1)
+						{
+							// Get position where we can add the new key
+							for(i = 0; i < order ; i++)
+							{
+								if((newRoot->Key[0] > temp->Key[i]) && (temp->Key[i] != 0))
+								{
+									pos = i+1;
+									break;
+								}
+							}
+							//printf("\n 1. ROOT IS EMPTY. So first here element will be created");
+							// Move existing data to right side of the array
+							for(i = order; i >= pos; i--)
+	  					 	{
+   					   	temp->Key[i]= temp->Key[i-1];
+    					  		temp->recordID[i].page= temp->recordID[i-1].page;
+    					  		temp->recordID[i].slot= temp->recordID[i-1].slot;
+ 					     		temp->next[i]= temp->next[i-1];
+  					    		temp->lchild[i]= temp->lchild[i-1];
+      						temp->rchild[i]= temp->rchild[i-1];     					      						
+							}
+      
+							// Add new key and RID value in correct position
+							temp->recordID[pos].page = newRoot->recordID[0].page;
+							temp->recordID[pos].slot = newRoot->recordID[0].slot;
+							temp->Key[pos] = newRoot->Key[0];
+							//temp->next[pos] = newRoot->next[0];
+							temp->lchild[pos] = newRoot->lchild[0];
+							temp->rchild[pos] = newRoot->rchild[0];	
+							temp->rchild[pos-1] = newRoot->lchild[0];			
+							temp->lchild[pos-1]->next[0] = newRoot->lchild[0];		
+							temp->lchild[pos]->next[0] = newRoot->rchild[0];		
+							temp->rchild[pos-1]->next[0] = newRoot->rchild[0];					
+							
+							root = temp;						
+							//free(temp);
+						}
 					}
-					
-					break;
+
+		  			break;
 				}
 				if(key->v.intV > temp->Key[order])
 				{
-					printf("\n 3 going to right child");
-					existingNode=temp->rchild[0];
-			
+					// CHECK NUMBER OF ELEMENTS IN THE NODE.
+					// IF MORE THAN ONE MEANS WE MUST FIND CORRECT CHILD NODE TO INSERT IN		
+					
+					if(temp->rchild[1] != NULL)
+						existingNode=temp->rchild[1];
+					else 
+						existingNode=temp->rchild[0];
+								
 					// check if existing node has space or not
 					result = isNodeFull(existingNode);
 					if(result == 1)
 					{
 						temp1 = existingNode;
 
-						printf("\n 4 existing node is not full so adding to existing node");
 						for(i = 0; i < order ; i++)
 						{	
-							printf("-- <%d> -- \t", temp1->Key[i]);
 							if(temp1->Key[i] != 0)
 							{
 								if(key->v.intV < temp1->Key[i])
 								{
 									pos = 0;
-									printf("\n position = <%d>",pos);
 									break;
 								}
 								if((temp1->Key[i] < key->v.intV) && (temp1->Key[i+1] > key->v.intV))
 								{	
 									pos = i+1;
-									printf("\n position = <%d>",pos);
 									break;
 								}
 								if(key->v.intV > temp1->Key[order] && (i==order-1))
 								{
 									pos = order;
-									printf("\n position = <%d>",pos);
 									break;
 								}
 							}
@@ -708,15 +895,124 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 						temp1->rchild[pos] = NULL;
 						
 						existingNode = temp1;
-						temp->rchild[0] = existingNode;
+						//temp->rchild[0] = existingNode;
+						if(temp->rchild[1] != NULL)
+							temp->rchild[1] = existingNode;
+						else 
+							temp->rchild[0] = existingNode;
 						root = temp;
 					}
-					else //split the child node
+					else // split the child node
 					{
+						newRoot = createNewBTNode(order);
+						newLNode = createNewBTNode(order);
+						newRNode = createNewBTNode(order);			
+						tempArr = createNewBTNode(order+1); // create new array with new key value as well
+						tempArr = existingNode; // set new array the value of node to be split
+
+						// Move existing data to right side of the array
+	   				for(i = (order-1); i >= pos; i--)
+   					{
+	      				tempArr->Key[i] = tempArr->Key[i-1];
+   	   				tempArr->recordID[i].page= tempArr->recordID[i-1].page;
+      					tempArr->recordID[i].slot= tempArr->recordID[i-1].slot;
+	      				tempArr->next[i]= tempArr->next[i-1];
+							tempArr->lchild[i]= tempArr->lchild[i-1];
+							tempArr->rchild[i]= tempArr->rchild[i-1];
+   	   			}	
+      		
+			      	// Add new key and RID value in correct position
+						tempArr->recordID[pos].page = rid.page;
+						tempArr->recordID[pos].slot = rid.slot;
+						tempArr->Key[pos] = key->v.intV;
+						tempArr->next[pos] = NULL;
+						tempArr->lchild[pos] = NULL;
+						tempArr->rchild[pos] = NULL;
+			
+						// split the new temporary array in left and right now based on splitIndex
+
+						midValue = order != 2 ? order - splitIndex : 2;
+			
+						// Add first half to left child
+						for(i = 0; i < midValue; i++)
+						{				
+							newLNode->recordID[i].page = tempArr->recordID[i].page;
+							newLNode->recordID[i].slot = tempArr->recordID[i].slot;
+							newLNode->Key[i] = tempArr->Key[i];
+							newLNode->next[i] = tempArr->next[i];
+							newLNode->lchild[i] = tempArr->lchild[i];
+							newLNode->rchild[i] = tempArr->rchild[i];
+						}
+			
+						// Add second half to right child
+						for(j=0,i = midValue; j < (midValue -1) ; j++,i++)
+						{
+							newRNode->recordID[j].page = tempArr->recordID[i].page;
+							newRNode->recordID[j].slot = tempArr->recordID[i].slot;
+							newRNode->Key[j] = tempArr->Key[i];
+							newRNode->next[j] = tempArr->next[i];
+							newRNode->lchild[j] = tempArr->lchild[i];
+							newRNode->rchild[j] = tempArr->rchild[i];
+						}
+
+						// Now as root is split, set new root values						
+						newRoot->recordID[0].page = newRNode->recordID[0].page;
+						newRoot->recordID[0].slot = newRNode->recordID[0].slot;
+						newRoot->Key[0] = newRNode->Key[0];
+						newRoot->next[0] = newLNode;
+						newRoot->lchild[0] = newLNode;
+						newRoot->rchild[0] = newRNode;														
+			
+						// Now as root is updated, change the next link of left/right children
+						newLNode->next[0] = newRNode;
+						newRNode->next[0] = NULL;		
+				
+						temp = root;
+						// clubbing both root nodes and realigning the links
+						result = isNodeFull(temp);
+						if(result == 1)
+						{
+							// Get position where we can add the new key
+							for(i = 0; i < order ; i++)
+							{
+								if((newRoot->Key[0] > temp->Key[i]) && (temp->Key[i] != 0))
+								{
+									pos = i+1;
+									break;
+								}
+							}
+							//printf("\n 1. ROOT IS EMPTY. So first here element will be created");
+							// Move existing data to right side of the array
+							for(i = order; i >= pos; i--)
+	  					 	{
+   					   	temp->Key[i]= temp->Key[i-1];
+    					  		temp->recordID[i].page= temp->recordID[i-1].page;
+    					  		temp->recordID[i].slot= temp->recordID[i-1].slot;
+ 					     		temp->next[i]= temp->next[i-1];
+  					    		temp->lchild[i]= temp->lchild[i-1];
+      						temp->rchild[i]= temp->rchild[i-1];     					      						
+							}
+      
+							// Add new key and RID value in correct position
+							temp->recordID[pos].page = newRoot->recordID[0].page;
+							temp->recordID[pos].slot = newRoot->recordID[0].slot;
+							temp->Key[pos] = newRoot->Key[0];
+							//temp->next[pos] = newRoot->next[0];
+							temp->lchild[pos] = newRoot->lchild[0];
+							temp->rchild[pos] = newRoot->rchild[0];	
+							temp->rchild[pos-1] = newRoot->lchild[0];			
+							temp->lchild[pos-1]->next[0] = newRoot->lchild[0];		
+							temp->lchild[pos]->next[0] = newRoot->rchild[0];		
+							temp->rchild[pos-1]->next[0] = newRoot->rchild[0];					
+							
+							root = temp;						
+							//free(temp);
+						}
 					}
 
-					break;
+		  			break;
 				}
+				
 			}
 		}
 	}		
@@ -725,7 +1021,7 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
     
    tree->mgmtData = root;
 	printTree(tree);
-	printf("\n----------------------------------");
+	printf("\n----------------------------------\n");
 	return RC_OK;
 }
 
