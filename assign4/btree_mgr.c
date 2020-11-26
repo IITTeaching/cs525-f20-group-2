@@ -42,7 +42,7 @@ extern RC shutdownIndexManager ()
 		free all allocated spaces
 	*/
 
-	shutdownBufferPool(bufferPool);
+	//shutdownBufferPool(bufferPool);
 	return RC_OK;
 }
 
@@ -151,10 +151,38 @@ extern RC closeBtree (BTreeHandle *tree)
 			return result;
 		}
 		// for total number of nodes, in for loop free all the keys/next values/RIDs
+		bPlusTreeNode *temp, *last;		
+		temp = tree->mgmtData;
+	
+		while(temp!=NULL)
+		{
+			last = temp;
+			while(last->next[0]!=NULL)
+			{
+				last = last->next[0];
+			}
+			for(int i = 0; i < order+1; i++)
+			{
+				last->next[i]=NULL;
+				last->lchild[i]=NULL;
+				last->rchild[i]=NULL;
+				last->Key[i]=0;
+				last->recordID=0;
+			}
+
+			temp = temp->next[0];
+		}
 		shutdownBufferPool(bufferPool);
+		tree->mgmtData=NULL;
+		root = temp = last = tree = NULL;
+
 		free(root);
-		free(bufferPool);	
+		free(treeHandle->mgmtData);
+		free(treeHandle);	
 		free(tree);
+		//free(bufferPool);
+		order = totalElements = totalLevels = 0;
+
 	}
 
 	return RC_OK;
@@ -244,6 +272,7 @@ extern RC findKey (BTreeHandle *tree, Value *key, RID *result)
 	{
 		for(nodeKey=0; nodeKey<order; nodeKey++)
 		{
+			//printf("\n treeNode->Key[nodeKey] = treeNode->Key[%d] = <%d>",nodeKey,treeNode->Key[nodeKey]);
 			if (treeNode->Key[nodeKey] == key->v.intV)
 			{
 				(*result).page = treeNode->recordID[nodeKey].page;
@@ -304,7 +333,7 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 
 	int i, j, pos, setLeftNode, setRightNode, value1, value2, result, splitIndex, midValue;
 	bPlusTreeNode *temp = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
-	bPlusTreeNode *newNode = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
+	//bPlusTreeNode *newNode = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
 	bPlusTreeNode *existingNode, *newLNode, *newRNode, *newRoot, *tempArr, *temp1;
 	
 	i = j = pos = setLeftNode = setRightNode = value1 = value2 = midValue = 0;
@@ -1032,20 +1061,17 @@ extern RC deleteKey (BTreeHandle *tree, Value *key)
 		1. Removes key with value specified in 'key' and corresponding record pointer.
 		2. Return RC_IM_KEY_NOT_FOUND if key not found in tree
 	*/
+	
     bPlusTreeNode *temp = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
     int found = 0, i;
-    for (temp = root; temp != NULL; temp = temp->next[order]) {
+    for (temp = root; temp != NULL; temp = temp->next[0]) {
         for (i = 0; i < order; i ++) {
             if (temp->Key[i] == key->v.intV) {
                 temp->Key[i] = 0;
                 temp->recordID[i].page = 0;
                 temp->recordID[i].slot = 0;
-                found = 1;
-                break;
             }
         }
-        if (found == 1)
-            break;
     }
     
 
