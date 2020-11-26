@@ -184,7 +184,7 @@ extern RC getNumNodes (BTreeHandle *tree, int *result)
 		Return number of nodes in B+ tree
 	*/
 		
-	int totalNodes = 0;
+	int totalNodes = 1;
 	bPlusTreeNode *temp = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
 	
 	temp = root;
@@ -192,7 +192,7 @@ extern RC getNumNodes (BTreeHandle *tree, int *result)
 	while(temp!=NULL)
 	{
 		totalNodes++;
-		temp = temp->next[order];
+		temp = temp->next[0];
 	}	
 	
 	*result = totalNodes;
