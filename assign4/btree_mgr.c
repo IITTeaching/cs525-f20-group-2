@@ -1,48 +1,21 @@
 #include "btree_mgr.h"
 
-typedef struct bPlusTreeRecord
-{
-	struct bPlusTreeRecord *nextRecord;
-	struct bPlusTreeRecord *prevRecord;
-	struct bPlusTreeRecord *lChild;
-	struct bPlusTreeRecord *rChild;
-	Value *key;
-	RID recordID;
-}bPlusTreeRecord;
-
-typedef struct bPlusTreeRecordList
-{
-	bPlusTreeRecord *start;
-	bPlusTreeRecord *end;
-}bPlusTreeRecordList;
-
 typedef struct bPlusTreeNode
 {
-	int order;
-	int numKeys;
-	bool isRoot;
-	bool isLeaf;
-	bool isIntNode;
-	int nodeNum;
-	bPlusTreeRecord *parent;
-	struct bPlusTreeRecordList *recordList;
-	struct bPlusTreeNode *nextNode;
-}bPlusTreeNode;
+    int *Key; // change this to Value *key later    
+    RID *recordID;
+    struct bPlusTreeNode **lchild;
+    struct bPlusTreeNode **rchild;
+    struct bPlusTreeNode **next;
+} bPlusTreeNode;
 
-typedef struct btManager
-{
-	bPlusTreeNode *tree;
-	Value **Keys;	// all keys in sorted order
-}btManager;
-
+DataType typeOfKey;
+int order;
+static int totalElements, totalLevels;
 bPlusTreeNode *root;
-btManager *treeManager;
-
 BTreeHandle *treeHandle;
 SM_FileHandle fileHandle;
 BM_BufferPool *bufferPool;
-
-static int globalNodeNum = 0;
 
 /* Initialize Index Manager */
 extern RC initIndexManager (void *mgmtData)
@@ -63,63 +36,37 @@ extern RC initIndexManager (void *mgmtData)
 extern RC shutdownIndexManager ()
 {
 	/*
-		shutdown record manager
 		shutdown buffer manager
 		shutdown storage manager
 		
 		free all allocated spaces
 	*/
-	if(treeManager != NULL) {
-		treeManager = NULL;
-		free(treeManager);
-	}
+
+	shutdownBufferPool(bufferPool);
 	return RC_OK;
 }
 
-bPlusTreeRecord *createNewRecord()
-{
-	bPlusTreeRecord *newRecord = (bPlusTreeRecord *) malloc(sizeof(bPlusTreeRecord));
-	newRecord->nextRecord = NULL;
-	newRecord->prevRecord = NULL;
-	newRecord->lChild = NULL;
-	newRecord->rChild = NULL;
-	newRecord->key = (Value *) malloc(sizeof(Value));
-	newRecord->key->v.intV = 0;
-	newRecord->recordID.slot = 0;
-	newRecord->recordID.page = 0;
-
-	return newRecord;
-}
-
-bPlusTreeNode *createNewBTNode(BTreeHandle *tree, bPlusTreeRecord *record)
+bPlusTreeNode *createNewBTNode(int n)
 {
 	int i;
-	int n = treeManager->tree->order;
-	treeManager = (btManager *) tree->mgmtData;
-	bPlusTreeNode *node = (bPlusTreeNode *) malloc(sizeof(bPlusTreeNode));
 	
-	node->order = n;
-	node->numKeys = 0;
-	node->isRoot = 0;
-	node->isLeaf = 1;
-	node->isIntNode = 0;
-	node->nodeNum = globalNodeNum + 1;
-	node->parent = record;
-	node->nextNode = NULL;
-	
-	treeManager->tree->nextNode = node;
-	
-	node->recordList = (bPlusTreeRecordList *) malloc(sizeof(bPlusTreeRecordList));
-
-	node->recordList->start = node->recordList->end = createNewRecord();
-	for(i=0; i<(n-1); i++)
+	bPlusTreeNode *newNode = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
+	newNode->Key = malloc(sizeof(int) * n);
+	newNode->recordID = malloc(sizeof(int) * n);
+	newNode->lchild = malloc(sizeof(bPlusTreeNode) * (n + 1));
+	newNode->rchild = malloc(sizeof(bPlusTreeNode) * (n + 1));
+	newNode->next = malloc(sizeof(bPlusTreeNode) * (n + 1));
+    
+   //newNode->next = NULL;
+	for (i = 0; i < n + 1; i ++)
 	{
-		node->recordList->end->nextRecord = createNewRecord();
-		node->recordList->end->nextRecord->prevRecord = node->recordList->end;
-		node->recordList->end = node->recordList->end->nextRecord;
-	}
-	
-	return node;
+		newNode->Key[i] = 0;
+		newNode->lchild[i] = NULL;
+		newNode->rchild[i] = NULL;
+		newNode->next[i] = NULL;
+   }
+   
+	return newNode;
 }
 
 /* Create B+ Tree */
@@ -135,54 +82,24 @@ extern RC createBtree (char *idxId, DataType keyType, int n)
 		Initialize all node values to NULL.
 	*/
 	
-	printf("\n INSIDE createBtree");
-	
-	RC result;
 	int i;
+	RC result;
 	
 	treeHandle = (BTreeHandle *) malloc(sizeof(BTreeHandle));
-	treeManager = (btManager *) malloc(sizeof(btManager));
-	bPlusTreeNode *node = (bPlusTreeNode *) malloc(sizeof(bPlusTreeNode));
 	
-	printf("\n INSIDE createBtree - after all mallocs");
-	treeHandle->keyType = keyType;
-	treeHandle->idxId=idxId;
-	node->order = n;
-	node->numKeys = 0;
-	node->isRoot = 0;
-	node->isLeaf = 0;
-	node->isIntNode = 0;
-	node->nodeNum = 0;
-	node->parent = NULL;
-	node->nextNode = NULL;
-	
-	root = node;
-		printf("\n INSIDE createBtree - after setting root");
-	node->recordList = (bPlusTreeRecordList *) malloc(sizeof(bPlusTreeRecordList));
-		printf("\n INSIDE createBtree - after malloc for recordList");
-	node->recordList->start = node->recordList->end = createNewRecord();
-		printf("\n INSIDE createBtree - after creating start and end new record");
-	for(i=0; i<(n-1); i++)
-	{
-		printf("\n INSIDE createBtree - creating record = %d",i);
-		node->recordList->end->nextRecord = createNewRecord();
-		node->recordList->end->nextRecord->prevRecord = node->recordList->end;
-		node->recordList->end = node->recordList->end->nextRecord;
-	}
-
-	treeManager->tree = node;
-	treeManager->Keys = NULL;
-
-	treeHandle->mgmtData=treeManager;
-	printf("\n INSIDE createBtree - after setting mgmtData ");
-
+	order = n;
+   root = createNewBTNode(n);
+   typeOfKey = keyType;
+   
+   treeHandle->mgmtData=root;
+   
 	if ((result = createPageFile(idxId)) != RC_OK)
 	{
 		printf("\n INSIDE createBtree - error in creating page file");
 		return result;
 	}
-		
-	return (RC_OK);
+    
+	return RC_OK;
 }
 
 /* Open B+ Tree */
@@ -191,30 +108,24 @@ extern RC openBtree (BTreeHandle **tree, char *idxId)
 	/*
 		Open the pagefile for read+write
 	*/
-	
-	printf("\n INSIDE openBtree ");
 	RC result;
 	
-	printf("\n INSIDE openBtree - before malloc");
 	*tree = (BTreeHandle *) malloc(sizeof(BTreeHandle));
-		printf("\n INSIDE openBtree - after malloc");
 	(*tree) = treeHandle;
-		printf("\n INSIDE openBtree - after setting mgmtData");
 	
-			printf("\n INSIDE openBtree - before openPageFile");
 	if ((result = openPageFile(idxId,&fileHandle)) != RC_OK)
 	{
 		printf("\n INSIDE openBtree - issue with openPageFile");
 		return result;
 	}
 		
-	result = initBufferPool(bufferPool, idxId, 1000, RS_CLOCK, NULL);
-
-	if (result != RC_OK) {
-				printf("\n INSIDE openBtree - issue with initBufferPool");
+	if ((result = initBufferPool(bufferPool, idxId, 1000, RS_CLOCK, NULL)) != RC_OK)
+	{
+		printf("\n INSIDE openBtree - issue with initBufferPool");
 		return result;
 	}
-	return result;
+	
+	return RC_OK;
 }
 
 /* Close B+ Tree */
@@ -222,19 +133,29 @@ extern RC closeBtree (BTreeHandle *tree)
 {
 	/*
 		Close page file
-		Flush all dirty pages to disk
+		Free all the allocated memory
 	*/
+	
+	RC result;
 
-	btManager *treeManager = (btManager*) tree->mgmtData;
-
-	shutdownBufferPool(bufferPool);
-	free(bufferPool);
-	free(treeManager->tree->recordList);
-	free(treeManager->tree->recordList->start);
-	free(treeManager->tree->recordList->end);
-	free(treeManager->tree);
-	free(treeManager);
-	free(tree);
+	if(tree->mgmtData == NULL)
+	{
+		printf("\n inside closeBtree - tree is empty");
+		return RC_IM_EMPTY_TREE;
+	}
+	else 
+	{
+		if ((result = closePageFile(&fileHandle)) != RC_OK)
+		{
+			printf("\n INSIDE closeBtree - issue with closePageFile");
+			return result;
+		}
+		// for total number of nodes, in for loop free all the keys/next values/RIDs
+		shutdownBufferPool(bufferPool);
+		free(root);
+		free(bufferPool);	
+		free(tree);
+	}
 
 	return RC_OK;
 }
@@ -247,10 +168,14 @@ extern RC deleteBtree (char *idxId)
 	*/
 	RC result;
 	if ((result = destroyPageFile(idxId)) != RC_OK)
+	{
+		printf("\n inside deleteBtree - issue with destroyPageFile");
 		return result;
-
+	}
+	
 	return RC_OK;
 }
+
 
 /* Get total number of nodes in B+ Tree */
 extern RC getNumNodes (BTreeHandle *tree, int *result)
@@ -258,25 +183,19 @@ extern RC getNumNodes (BTreeHandle *tree, int *result)
 	/*
 		Return number of nodes in B+ tree
 	*/
-	int numOfNodes = 0;
-	btManager * treeManager = (btManager *) tree->mgmtData;
-
-	if(tree == NULL)
-	{
-		//printf("\n TREE NOT PRESENT\n");
-		return RC_ERROR; 
-	}
-	else
-	{
-		bPlusTreeNode *node = (bPlusTreeNode *) treeManager->tree;
-		while(node->nextNode != NULL)
-		{
-			node = node->nextNode;
-			numOfNodes++;
-		}
-	}
+		
+	int totalNodes = 0;
+	bPlusTreeNode *temp = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
 	
-	*result = numOfNodes;
+	temp = root;
+	
+	while(temp!=NULL)
+	{
+		totalNodes++;
+		temp = temp->next[order];
+	}	
+	
+	*result = totalNodes;
 	
 	return RC_OK;
 }
@@ -288,22 +207,8 @@ extern RC getNumEntries (BTreeHandle *tree, int *result)
 		Return number of entries in B+ tree
 	*/
 	
-	//int numOfEntries = 0;
-	//btManager *treeManager = (btManager *) tree->mgmtData;
-
-	// count of keys in treeManager->keys
-
-	if(tree == NULL) 
-	{
-		return RC_ERROR;
-	}
+	*result = totalElements;
 	
-	if(tree->recordSize == -1) 
-	{
-		return RC_ERROR;
-	}
-
-	*result = tree->recordSize;
 	return RC_OK;
 }
 
@@ -313,15 +218,9 @@ extern RC getKeyType (BTreeHandle *tree, DataType *result)
 	/*
 		Return type of key in B+ tree
 	*/
-	if (tree == NULL) {
-		return RC_ERROR;
-	}
 	
-	if (tree->keyType == NULL) {
-		return RC_ERROR;
-	}
+	*result = typeOfKey;
 	
-	*result = tree->keyType;
 	return RC_OK;
 }
 
@@ -333,52 +232,52 @@ extern RC findKey (BTreeHandle *tree, Value *key, RID *result)
 		2. Return RID for entry where search key matches
 		3. If key not found, return RC_IM_KEY_NOT_FOUND
 	*/
-		printf("\n INSIDE findKey ");
-	int recordFound = 0;
-	// Retrieve B+ Tree's metadata information.
-	//btManager *treeMgr = (btManager *) tree->mgmtData;
-	bPlusTreeRecordList *recordList;
-	bPlusTreeRecord *record;
+	
+	int recordFound, nodeKey, nodeRID, i;
+	
+	bPlusTreeNode *treeNode = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
+	treeNode = root;
+	
+	recordFound = nodeKey = nodeRID = i = 0;
 
-	//bPlusTreeNode *node  = (bPlusTreeNode *) treeMgr->tree;
-	bPlusTreeNode *node = root;
-			printf("\n INSIDE findKey - afer setting node ");
-			printf("\n node->nextNode = <%d>",node->nextNode);
-	while(node != NULL)
+	while(treeNode!=NULL)
 	{
-				printf("\n 1 INSIDE findKey - inside while for node");
-		//if(node->isLeaf == 1)
-		//{
-		
-			recordList = node->recordList;
-			record = recordList->start;
-			while(record->nextRecord != NULL)
+		for(nodeKey=0; nodeKey<order; nodeKey++)
+		{
+			if (treeNode->Key[i] == key->v.intV)
 			{
-							printf("\n 2 INSIDE findKey - inside while for record ");
-							printf("\n 3 INSIDE findKey - key->v.intV = <%d>", key->v.intV );
-							printf("\n 4 INSIDE findKey - record->key->v.intV = <%d>", record->key->v.intV );
-							printf("\n ###################################################### ");
-							printf("\n ###################################################### ");
-							printf("\n ###################################################### ");
-				if(key->v.intV == record->key->v.intV)
-				{
-					printf("\n INSIDE findKey - match found");
-					*result = record->recordID;
-					recordFound = 1;
-					break;
-				}
-				record=record->nextRecord;
+				(*result).page = treeNode->recordID[i].page;
+				(*result).slot = treeNode->recordID[i].slot;
+				recordFound = 1;
+				break;
 			}
-	//	}
-		node=node->nextNode;			
+		}
+		treeNode=treeNode->next[order];
 	}
-
-	if (recordFound == 0)	return RC_IM_KEY_NOT_FOUND;
-
+	
+   if(recordFound == 0)
+   {
+   	//printf("\n inside findKey - key not found in tree");
+   	return RC_IM_KEY_NOT_FOUND;
+   }
+        
 	return RC_OK;
 }
 
 
+/* Check if node if full or not */
+int isNodeFull (bPlusTreeNode *node)
+{
+	bPlusTreeNode *temp = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
+	for (temp = node; temp != NULL; temp = temp->next[order])
+		for (int i = 0; i < order; i ++) 
+			if (temp->Key[i] == 0)
+				return 1;
+				
+	return 0;	
+}
+
+/* Insert key in B+ tree */
 extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 {
 	/*
@@ -389,322 +288,297 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 		Check if tree is already created or not.
 			If not return error that tree is not created
 		If tree is already created:
-			a. Check if key is already present in tree or not. Use ** keys added in btree structure
-				If key present
-					Then return RC_IM_KEY_ALREADY_EXISTS
-				Else
-					find node where key can be inserted.
-					For finding node,
-						a. Check all values in root node.
-						b. Based on values in root node, get the lchild/ rchild.
-						c. Once leaf node is found, then check all values in the key
+			a. Check if there is any key added to tree or not
+				If not, add to root
+			b. If root is full, check where new value can be placed and then split the root
 	*/
+
+	//printf("\n INSIDE insertKey ");
+	//tree = treeHandle;
+	printf("\n----------------------------------");
 	
+	//BM_PageHandle *page = (BM_PageHandle *) malloc(sizeof(BM_PageHandle));
 	
-	printf("\n INSIDE insertKey ");
-	printf("\n----------------------");
-	tree = treeHandle;
 	// Retrieve B+ Tree's metadata information.
-	btManager *treeMgr = (btManager *) tree->mgmtData;
+	//bPlusTreeNode *treeNode = (bPlusTreeNode *) tree->mgmtData;
 
-	printf("\n----------------------");
-	bPlusTreeRecordList *recordList;
-	printf("\n----------------------");
-	bPlusTreeRecord *record1, *record2;
-	printf("\n----------------------");
-	RID *resultRid;
-	int value1, value2, result;
-	BM_PageHandle *page = (BM_PageHandle *) malloc(sizeof(BM_PageHandle));
-	bPlusTreeNode *leftNode = (bPlusTreeNode *) malloc(sizeof(bPlusTreeNode));
-	bPlusTreeNode *rightNode = (bPlusTreeNode *) malloc(sizeof(bPlusTreeNode));
+	int i, j, pos, setLeftNode, setRightNode, value1, value2, result, splitIndex, midValue;
+	bPlusTreeNode *temp = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
+	bPlusTreeNode *newNode = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
+	bPlusTreeNode *existingNode, *newLNode, *newRNode, *newRoot, *tempArr;
 	
+	i = j = pos = setLeftNode = setRightNode = value1 = value2 = midValue = 0;
+	result = 1;
+ 
+ 	splitIndex = ((order == 2) || ((order % 2) != 0)) ? (order/2)+1 : order/2 ;
 	
-	//printf("\n INSIDE insertKey - bTreeOrder = <%d>",treeMgr->tree->order);
-		printf("\n INSIDE insertKey - after all mallocs");
-	resultRid->page = rid.page;
-	resultRid->slot = rid.slot;
-
-		printf("\n INSIDE insertKey - rid.page = <%d>",rid.page);
-		printf("\n INSIDE insertKey - rid.slot = <%d>",rid.slot);
-	//int bTreeOrder = treeMgr->tree->order;
-	result = value1 = value2 = 0;
-	
-			//printf("\n INSIDE insertKey - bTreeOrder = <%d>",bTreeOrder);
-
 	// If the tree doesn't exist yet, return error saying trying to insert in non-existing tree
 	if (root == NULL) {
-		// tree is empty
-				printf("\n INSIDE insertKey - root is null ");
+		printf("\n inside insertKey - trying to insert in empty tree. create tree first. ");
+		return RC_IM_EMPTY_TREE;
 	}
 	
-	// get root node value
-	bPlusTreeNode *node = root;
-	
 	// Check if record with the specified key already exists.
-	if(node->numKeys != 0)
+	if(totalElements != 0)
 	{
-		if (findKey(tree, key, resultRid) == RC_OK) {
+		if (findKey(tree, key, &rid) == RC_OK)
+		{
 			printf("\n insertKey - key already exists");
 			return RC_IM_KEY_ALREADY_EXISTS;
 		}
 	}
-
+	
 	// ANJALI - Start from root. Check if that node is full or not.
 	// ANJALI - If root is full, then check between which node does record fall in
 	// ANJALI - Then based on greater or less than value, go to left child node or right child node.
 	// ANJALI - once we find which record it falls under, then 
-	
-
-	// Check if there is place in root for new key
-	if(node->nodeNum == 0 || (node->numKeys != node->order))
-	{
-		printf("\n INSIDE IF of nodeNum = 0 and numKeys != order ");
 		
-		if(node->numKeys == node->order)
-			printf("\n Node is full. Check for its children");
-		else if(node->numKeys == 0) // Add first record in root of tree
+	temp = root;
+		
+	if(totalLevels == 0) // meaning root is not initialized or not full yet
+	{
+		result = isNodeFull(temp);
+		if(result == 1)
 		{
-			printf("\n ADDING FIRST RECORD IN ROOT OF TREE");
-			recordList = node->recordList;
-			record1 = recordList->start;
-			printf("\n 1 page->data = <%s>",page->data);
-			printf("\n key->v.intV = <%d>", key->v.intV);
-			sprintf(page->data , "%d", key->v.intV);
-			printf("\n 2 page->data = <%s>",page->data);
-			printf("\n###############################################");
-			printf("\n###############################################");
-			printf("\n###############################################");
-			result = pinPage(bufferPool, page, rid.page);
-			if(result != RC_OK)
+			// Get position where we can add the new key
+			printf("\n 1 ");
+			for(i = 0; i < order ; i++)
 			{
-				printf("\n Issue with pinning page");
-				free(page);
-				return result;
-			}
-			
-			printf("\n 3 page->data = <%s>",page->data);		
-			//printf("\n 4 page->data = <%d>",atoi(page->data));
-			printf("\n###############################################");
-			printf("\n###############################################");	
-			//record1->key->dt = DT_INT;
-			//record1->key = page->data;
-			//record1->key->v.intV = atoi(page->data);
-			//record1->key = stringToValue(page->data);
-			//record1->recordID = rid;
-			//record1->key = stringToValue(page->data);
-			record1->recordID = rid;
-			//printf("\n record1->key->dt = <%d>",record1->key->dt);
-			//printf("\n record1->key->v.intV = <%d>",record1->key->v.intV);
-			printf("\n record1->recordID.page = <%d>, record1->recordID.slot = <%d>",record1->recordID.page,record1->recordID.slot);
-			
-			printf("\n###############################################");	
-			node->numKeys = 1;
-			node->nodeNum = 1;
-			globalNodeNum = 1;
-			node->isRoot = 1;
-			node->isLeaf = 0;
-			node->isIntNode = 0;		
-			
-			result = markDirty(bufferPool, page);
-			if(result != RC_OK)
-			{
-				printf("\n Issue with marking page dirty");
-				return result;
-			}
-			
-			result = unpinPage(bufferPool, page);
-			if(result != RC_OK)
-			{
-				printf("\n Issue with unpinning page");
-				return result;
-			}
-			
-			result = forceFlushPool(bufferPool);
-			if(result != RC_OK)
-			{
-				printf("\n Issue with force flushing pool");
-				return result;
-			}
-			
-			printf("\n NOW CREATING LEFT AND RIGHT CHILDREN\n");
-			// Once record is added in tree, create left and right children (nodes) for the record
-			leftNode = createNewBTNode(tree,record1);
-			rightNode = createNewBTNode(tree,record1);
-			
-			// add these new nodes as nextNode for root node also add value for parent of these child nodes
-			
-			record1->lChild = leftNode->recordList->start;
-			record1->rChild = rightNode->recordList->start;
-			printf("\n SUCCESSFULLY COMPLETED CREATING LEFT AND RIGHT CHILDREN\n");
-			free(page);
-			result = RC_OK;
-		}
-		else // Add next records in root of tree
-		{
-			printf("\n ADDING NEXT RECORD IN ROOT OF TREE");
-			recordList = node->recordList;
-			record1 = recordList->start;
-			record2 = recordList->start->nextRecord;
-
-			do
-			{
-				value1 = record1->key->v.intV;
-				value2 = record2->key->v.intV;
-				
-				if(key->v.intV < value1)
+				printf("-- <%d> -- \t", temp->Key[i]);
+				if((key->v.intV > temp->Key[i]) && (temp->Key[i] != 0))
 				{
-					printf("\n ADDING RECORD BEFORE EXISTING RECORD IN ROOT OF TREE");
-					record2->key->v.intV = value1;
-					record2->recordID= record1->recordID;
-					
-					result = pinPage(bufferPool, page, rid.page);
-					if(result != RC_OK)
-					{
-						printf("\n Issue with pinning page");
-						free(page);
-						return result;
-					}
-			
-					record1->key = page->data;
-					record1->recordID = rid;
-			
-					node->numKeys = node->numKeys + 1;
-			
-					result = markDirty(bufferPool, page);
-					if(result != RC_OK)
-					{
-						printf("\n Issue with marking page dirty");
-						return result;
-					}
-				
-					result = unpinPage(bufferPool, page);
-					if(result != RC_OK)
-					{
-						printf("\n Issue with unpinning page");
-						return result;
-					}
-				
-					result = forceFlushPool(bufferPool);
-					if(result != RC_OK)
-					{
-						printf("\n Issue with force flushing pool");
-						return result;
-					}
-			
-					// Once record is added in tree, create left and right children (nodes) for the record
-					leftNode = createNewBTNode(tree,record1);
-					rightNode = createNewBTNode(tree,record1);
-			
-					record1->lChild = leftNode->recordList->start;
-					record1->rChild = rightNode->recordList->start;
-					record1->lChild = rightNode->recordList->start;
-					
-					free(page);
-					result = RC_OK;
+					pos = i+1;
 					break;
 				}
-				else if(key->v.intV > value1)
+			}
+			printf("\n 1. ROOT IS EMPTY. So first here element will be created");
+			// Move existing data to right side of the array
+   		for(i = order; i >= pos; i--)
+	   	{
+   	   	temp->Key[i]= temp->Key[i-1];
+      		temp->recordID[i].page= temp->recordID[i-1].page;
+      		temp->recordID[i].slot= temp->recordID[i-1].slot;
+      		temp->next[i]= temp->next[i-1];
+      		temp->lchild[i]= temp->lchild[i-1];
+      		temp->rchild[i]= temp->rchild[i-1];
+      	}
+      
+    	  if(pos == 0)
+	      {
+  	 		   // Add new key and RID value in correct position
+				temp->recordID[pos].page = rid.page;
+				temp->recordID[pos].slot = rid.slot;
+				temp->Key[pos] = key->v.intV;
+				temp->next[pos] = NULL;
+				temp->lchild[pos] = NULL;
+				temp->rchild[pos] = NULL;
+			}
+			else 
+			{
+  		 	   // Add new key and RID value in correct position
+				temp->recordID[pos].page = rid.page;
+				temp->recordID[pos].slot = rid.slot;
+				temp->Key[pos] = key->v.intV;
+				temp->next[pos] = NULL;
+				temp->lchild[pos] = temp->rchild[pos-1];
+				temp->rchild[pos] = NULL;
+			}
+		
+			root = temp;
+			//free(temp);
+		}
+		
+		if(isNodeFull(root) == 0)
+			totalLevels++;
+	}
+	else // root node is full so create left and right child nodes. or try to add to existing left/right node
+	{
+		printf("\n 2. ROOT IS FULL. SO NOW CHILD NODES WILL BE CREATED");
+		// if yes, then create go to left and right node if already created. else create left and right nodes.
+		// SO HERE IF NODEFULL IS 1 IT MEANS THERE WAS SPACE IN NODE TO ADD KEY.
+		// IF ITS 0 IT MEANS THE NODE WAS FULL
+		// SO IT CHECKS IF THE NODE IS FULL AND NEXT NODE IS NULL OR NOT
+		// IF NEXT NODE IS NULL THEN, ADD NEW NODE TO NEXT OF EXISTING NODE. AND SET NEXT OF NEW NODE TO NULL
+		temp = root;
+
+		printf("\n 2 ");
+		for(i = 0; i < order ; i++)
+		{
+			printf("-- i = %d, <%d> -- \t", i, temp->Key[i]);
+			
+			if(key->v.intV < temp->Key[i])
+			{
+				pos = 0;
+				break;
+			}
+			if((temp->Key[i] < key->v.intV) && (temp->Key[i+1] > key->v.intV))
+			{
+				pos = i+1;
+				break;
+			}
+			if(key->v.intV > temp->Key[order])
+			{
+				pos = order;
+				break;
+			}
+		}
+
+		if(temp->next[0] == NULL) // create new nodes as there node is not split already
+		{
+			newRoot = createNewBTNode(order);
+			newLNode = createNewBTNode(order);
+			newRNode = createNewBTNode(order);			
+			tempArr = createNewBTNode(order+1); // create new array with new key value as well
+			tempArr = root; // set this new array to root
+
+			// Move existing data to right side of the array
+
+   		for(i = (order-1); i >= pos; i--)
+   		{
+	      	tempArr->Key[i] = tempArr->Key[i-1];
+   	   	tempArr->recordID[i].page= tempArr->recordID[i-1].page;
+      		tempArr->recordID[i].slot= tempArr->recordID[i-1].slot;
+	      	tempArr->next[i]= tempArr->next[i-1];
+				tempArr->lchild[i]= tempArr->lchild[i-1];
+				tempArr->rchild[i]= tempArr->rchild[i-1];
+   	   }	
+      		
+      	// Add new key and RID value in correct position
+			tempArr->recordID[pos].page = rid.page;
+			tempArr->recordID[pos].slot = rid.slot;
+			tempArr->Key[pos] = key->v.intV;
+			tempArr->next[pos] = NULL;
+			tempArr->lchild[pos] = NULL;
+			tempArr->rchild[pos] = NULL;
+			
+			// split the new temporary array in left and right now based on splitIndex
+
+			midValue = order != 2 ? order - splitIndex : 2;
+			
+			// Add first half to left child
+			for(i = 0; i < midValue; i++)
+			{				
+				newLNode->recordID[i].page = tempArr->recordID[i].page;
+				newLNode->recordID[i].slot = tempArr->recordID[i].slot;
+				newLNode->Key[i] = tempArr->Key[i];
+				newLNode->next[i] = tempArr->next[i];
+				newLNode->lchild[i] = tempArr->lchild[i];
+				newLNode->rchild[i] = tempArr->rchild[i];
+			}
+			
+			// Add second half to right child
+			for(j=0,i = midValue; i < (midValue + order) ; j++,i++)
+			{
+				
+				newRNode->recordID[j].page = tempArr->recordID[i].page;
+				newRNode->recordID[j].slot = tempArr->recordID[i].slot;
+				newRNode->Key[j] = tempArr->Key[i];
+				newRNode->next[j] = tempArr->next[i];
+				newRNode->lchild[j] = tempArr->lchild[i];
+				newRNode->rchild[j] = tempArr->rchild[i];
+			}
+
+			// Now as root is split, set new root values
+			newRoot->recordID[0].page = newRNode->recordID[0].page;
+			newRoot->recordID[0].slot = newRNode->recordID[0].slot;
+			newRoot->Key[0] = newRNode->Key[0];
+			newRoot->next[0] = newLNode;
+			newRoot->lchild[0] = newLNode;
+			newRoot->rchild[0] = newRNode;
+			
+			// Now as root is updated, change the next link of left/right children
+			newLNode->next[0] = newRNode;
+			newRNode->next[0] = NULL;		
+			
+			// set root to new root
+			root = newRoot;
+			totalLevels++;
+			//free(newRoot);
+			//free(temp);
+			//free(tempArr);	
+		}
+		else // check if there is place in existing nodes and add value
+		{
+			printf("\n As left and right child are existing, checking where we can insert key ");
+			temp = root;
+			printf("\n 3 ");
+			for(i = 0; i < order; i ++ )
+			{
+				printf("-- <%d> -- \t", temp->Key[i]);
+				if(key->v.intV < temp->Key[i])
 				{
-					printf("\n ADDING RECORD AFTER EXISTING RECORD IN ROOT OF TREE");
-					//record2->key.v.intV = key->v.intV
-					//record2->recordID = rid;
-					
-					result = pinPage(bufferPool, page, rid.page);
-					if(result != RC_OK)
-					{
-						printf("\n Issue with pinning page");
-						free(page);
-						return result;
-					}
-			
-					record2->key = page->data;
-					record2->recordID = rid;
-			
-					node->numKeys = node->numKeys + 1;
-			
-					result = markDirty(bufferPool, page);
-					if(result != RC_OK)
-					{
-						printf("\n Issue with marking page dirty");
-						return result;
-					}
-				
-					result = unpinPage(bufferPool, page);
-					if(result != RC_OK)
-					{
-						printf("\n Issue with unpinning page");
-						return result;
-					}
-				
-					result = forceFlushPool(bufferPool);
-					if(result != RC_OK)
-					{
-						printf("\n Issue with force flushing pool");
-						return result;
-					}
-					
-					// Once record is added in tree, create left and right children (nodes) for the record
-					leftNode = createNewBTNode(tree,record2);
-					rightNode = createNewBTNode(tree,record2);
-			
-					record2->lChild = leftNode->recordList->start;
-					record2->rChild = rightNode->recordList->start;
-					record1->rChild = leftNode->recordList->start;
-			
-					free(page);
-					result = RC_OK;
+					printf("\n going to left child");
+					existingNode=temp->lchild[0];
 					break;
 				}
+				if((temp->Key[i] < key->v.intV) && (temp->Key[i+1] > key->v.intV))
+				{
+					printf("\n going to right child");
+					existingNode=temp->rchild[0];
+					break;
+				}
+				if(key->v.intV > temp->Key[order])
+				{
+					printf("\n going to right child");
+					existingNode=temp->rchild[0];
+					break;
+				}
+			}
+			
+			// check if existing node has space or not
+			result = isNodeFull(existingNode);
+			if(result == 1)
+			{
+				temp = existingNode;
+
+				printf("\n 4 existing node is not full so adding to existing node");
+				for(i = 0; i < order ; i++)
+				{	
+					printf("-- <%d> -- \t", temp->Key[i]);
+					if(key->v.intV < temp->Key[i])
+					{
+						pos = 0;
+						break;
+					}
+					if((temp->Key[i] < key->v.intV) && (temp->Key[i+1] > key->v.intV))
+					{
+						pos = i+1;
+						break;
+					}
+					if(key->v.intV > temp->Key[order])
+					{
+						pos = order;
+						break;
+					}
+				}					
 				
-				record1 = record2;
-				record2 = record2->nextRecord;
-				
-			}while(record2->nextRecord != NULL);
+				// Move existing data to right side of the array
+				for(i = (order-1); i >= pos; i--)
+				{
+					temp->Key[i]= temp->Key[i-1];
+					temp->recordID[i].page= temp->recordID[i-1].page;
+					temp->recordID[i].slot= temp->recordID[i-1].slot;
+					temp->next[i]= temp->next[i-1];
+					temp->lchild[i]= temp->lchild[i-1];
+					temp->rchild[i]= temp->rchild[i-1];
+				}
+      
+  			   // Add new key and RID value in correct position
+				temp->recordID[pos].page = rid.page;
+				temp->recordID[pos].slot = rid.slot;
+				temp->Key[pos] = key->v.intV;
+				temp->next[pos] = NULL;
+				temp->lchild[pos] = temp->rchild[pos-1];
+				temp->rchild[pos] = NULL;
+			}
 		}
-	}
-	
-	// As root is full, lets check the correct leaf to add key
-	// traverse in root to get lchild and rchild value
-/*
-	bPlusTreeNode *node = root;
-	bPlusTreeRecord *childNode. *rootRecord;
-	int postitionFound = 0;
-	
-	rootRecord = node->recordList->start;
-	while(rootRecord->nextNode != NULL || positionFound == 0)
-	{
-		record1 = rootRecord;
-		record2 = rootRecord->nextRecord;
-		
-		value1 = record1->key.v.intV;
-		value2 = record2->key.v.intV;
-		
-		if(key->v.intV < value1)
-		{
-			childNode = record1->lChild;
-			positionFound = 1;
-			break;
-		}
-		else if((key->v.intV >= value1) && (key->v.intV < value2))
-		{
-			childNode = record1->rChild;
-			positionFound = 1;
-			break;
-		}
-		else
-		{
-			record1 = record2;
-			record2 = record2->nextRecord;
-		}
-	}
-	
-	if(positionFound == 1)
-	{
-		
-	}
-	*/
-	
+	}		
+									
+	totalElements++;
+    
+   tree->mgmtData = root;
 	printTree(tree);
+	printf("\n----------------------------------");
 	return RC_OK;
 }
 
@@ -715,13 +589,24 @@ extern RC deleteKey (BTreeHandle *tree, Value *key)
 		1. Removes key with value specified in 'key' and corresponding record pointer.
 		2. Return RC_IM_KEY_NOT_FOUND if key not found in tree
 	*/
-	// Retrieve B+ Tree's metadata information.
-	//btManager *treeManager = (btManager *) tree->mgmtData;
+    bPlusTreeNode *temp = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
+    int found = 0, i;
+    for (temp = root; temp != NULL; temp = temp->next[order]) {
+        for (i = 0; i < order; i ++) {
+            if (temp->Key[i] == key->v.intV) {
+                temp->Key[i] = 0;
+                temp->recordID[i].page = 0;
+                temp->recordID[i].slot = 0;
+                found = 1;
+                break;
+            }
+        }
+        if (found == 1)
+            break;
+    }
+    
 
-	// Deleting the entry with the specified key.
-	//treeManager->root = delete(treeManager, key);
-	//printTree(tree);
-	return RC_OK;
+    return RC_OK;
 }
 
 /* Open B+ tree for scanning */
@@ -730,45 +615,6 @@ extern RC openTreeScan (BTreeHandle *tree, BT_ScanHandle **handle)
 	/*
 		1. Helps to scan b+ tree in sort order
 	*/
-	
-	/* BORIS BT_ScanHandle *sc;
-	RID rid;
-	int rc;
-	startTreeScan(btree, sc, NULL);
-	while((rc = nextEntry(sc, &rid)) == RC_OK)
-	{
-    	// do something with rid
-	}
-	if (rc != RC_IM_NO_MORE_ENTRIES)
-    	// handle the error
-	closeTreeScan(sc);*/
-	
-	// Retrieve B+ Tree's metadata information.
-	//btManager *treeManager = (btManager *) tree->mgmtData;
-
-	// Retrieve B+ Tree Scan's metadata information.
-	//ScanManager *scanmeta = malloc(sizeof(ScanManager));
-
-	// Allocating some memory space.
-	//*handle = malloc(sizeof(BT_ScanHandle));
-
-	/*Node * node = treeManager->root;
-	if (treeManager->root == NULL) {
-		//printf("Empty tree.\n");
-		return RC_NO_RECORDS_TO_SCAN;
-	} else {
-		//printf("\n openTreeScan() ......... Inside ELse  ");
-		while (!node->is_leaf)
-			node = node->pointers[0];
-		// Initializing (setting) the Scan's metadata information.
-		scanmeta->keyIndex = 0;
-		scanmeta->totalKeys = node->num_keys;
-		scanmeta->node = node;
-		scanmeta->order = treeManager->order;
-		(*handle)->mgmtData = scanmeta;
-		//printf("\n keyIndex = %d, totalKeys = %d ", scanmeta->keyIndex, scanmeta->totalKeys);
-	}*/
-	return RC_OK;
 }
 
 /* Go to next entry in B+ Tree */
@@ -778,98 +624,52 @@ extern RC nextEntry (BT_ScanHandle *handle, RID *result)
 		1. Should return RID of record
 		2. Should return RC_IM_NO_MORE_ENTRIES if no more entries in tree
 	*/
-	//printf("\n INSIDE nextEntry()...... ");
-	// Retrieve B+ Tree Scan's metadata information.
-/*	ScanManager * scanmeta = (ScanManager *) handle->mgmtData;
-	// Retrieving all the information.
-	int keyIndex = scanmeta->keyIndex;
-	int totalKeys = scanmeta->totalKeys;
-	int bTreeOrder = scanmeta->order;
-	RID rid;
-	//printf("\n keyIndex = %d, totalKeys = %d ", keyIndex, totalKeys);
-	Node * node = scanmeta->node;
-	// Return error if current node is empty i.e. NULL
-	if (node == NULL) {
-		return RC_IM_NO_MORE_ENTRIES;
-	}
-	if (keyIndex < totalKeys) {
-		// If current key entry is present on the same leaf node.
-		rid = ((NodeData *) node->pointers[keyIndex])->rid;
-		//printf(" ... KEYS = %d", node->keys[keyIndex]->v.intV);
-		//printf("  page = %d, slot = %d  ", rid.page, rid.slot);
-		scanmeta->keyIndex++;
-	} else {
-		// If all the entries on the leaf node have been scanned, Go to next node...
-		if (node->pointers[bTreeOrder - 1] != NULL) {
-			node = node->pointers[bTreeOrder - 1];
-			scanmeta->keyIndex = 1;
-			scanmeta->totalKeys = node->num_keys;
-			scanmeta->node = node;
-			rid = ((NodeData *) node->pointers[0])->rid;
-			//printf("  page = %d, slot = %d  ", rid.page, rid.slot);
-		} else {
-			// If no next node, it means no more enteies to be scanned..
-			return RC_IM_NO_MORE_ENTRIES;
-		}
-	}
-	// Store the record/result/RID.
-	*result = rid;*/
-	return RC_OK;
+
 }
 
 /* Close B+ tree for opened scanning */
 extern RC closeTreeScan (BT_ScanHandle *handle)
 {
-	//handle->mgmtData = NULL;
-	//free(handle);
-	return RC_OK;
 }
 
 /* Print B+ tree for debugging */
 extern char *printTree (BTreeHandle *tree)
 {
-	btManager *treeManager = (btManager *) tree->mgmtData;
-	bPlusTreeRecordList *recordList;
-	bPlusTreeRecord *record;
-	bPlusTreeNode *node;
-	
+	bPlusTreeNode *node = (bPlusTreeNode *) tree->mgmtData;
+	bPlusTreeNode *temp;
 	printf("\nPRINTING TREE:\n");
 
 	if (root == NULL) {
 		printf("Empty tree.\n");
 		return RC_IM_EMPTY_TREE;
 	}
-
-	node  = (bPlusTreeNode *) treeManager->tree;
-	do
+	
+	node = root;
+	while(node!=NULL)
 	{
-		//if(node->isRoot == 1)
-		//{
-			recordList = node->recordList;
-			record = recordList->start;
-			do
+		for(int i = 0; i<order; i++)
+		{
+			switch (typeOfKey) 
 			{
-				switch (tree->keyType) 
-				{
-					case DT_INT:
-						printf("#####<%d>##### ", (record->key)->v.intV);
-						break;
-					case DT_FLOAT:
-						printf("#####<%.02f>##### ", (record->key)->v.floatV);
-						break;
-					case DT_STRING:
-						printf("#####<%s>##### ", (record->key)->v.stringV);
-						break;
-					case DT_BOOL:
-						printf("#####<%d>##### ", (record->key)->v.boolV);
-						break;
-				}
-				record = record->nextRecord;
-			}while(record->nextRecord != NULL);
-	//	}
-		node=node->nextNode;
-		printf("\t");
-	}while(node->nextNode != NULL);
+				case DT_INT:
+					printf("<%d>", node->Key[i]);
+					break;
+				case DT_FLOAT:
+					printf("<%.02f>", node->Key[i]);
+					break;
+				case DT_STRING:
+					printf("<%s>", node->Key[i]);
+					break;
+				case DT_BOOL:
+					printf("<%d>", node->Key[i]);
+					break;
+			}
+			printf("\t##");
+		}
+		
+		node=node->next[0];
+		printf("\n$$");
+	};
 
 	return '\0';
 }

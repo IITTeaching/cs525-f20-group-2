@@ -14,7 +14,6 @@ typedef int RC;
 #define RC_FILE_HANDLE_NOT_INIT 2
 #define RC_WRITE_FAILED 3
 #define RC_READ_NON_EXISTING_PAGE 4
-#define RC_ERROR 5
 
 #define RC_RM_COMPARE_VALUE_OF_DIFFERENT_DATATYPE 200
 #define RC_RM_EXPR_RESULT_IS_NOT_BOOLEAN 201
@@ -44,6 +43,7 @@ typedef int RC;
 
 // ANJALI - ASSIGNMENT 4
 #define RC_IM_EMPTY_TREE 701
+#define RC_IM_ERROR_ADDING_VALUE_IN_NODE 702
 
 /* holder for error messages */
 extern char *RC_message;
