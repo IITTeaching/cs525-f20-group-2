@@ -324,7 +324,7 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 
 	//printf("\n INSIDE insertKey ");
 	//tree = treeHandle;
-	//printf("\n----------------------------------");
+	printf("\n----------------------------------");
 	
 	//BM_PageHandle *page = (BM_PageHandle *) malloc(sizeof(BM_PageHandle));
 	
@@ -454,20 +454,26 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 
 			// Move existing data to right side of the array
 
-   		for(i = (order-1); i >= pos; i--)
+			//printf("\n POSITION = <%d>",pos);
+   		for(i = (order); i >= pos; i--)
    		{
+   			//printf("\n tempArr->Key[i] = tempArr->Key[%d] = <%d>",i,tempArr->Key[i]);
+   			//printf("\n tempArr->Key[i-1] = tempArr->Key[%d] = <%d>",i-1,tempArr->Key[i-1]);
 	      	tempArr->Key[i] = tempArr->Key[i-1];
    	   	tempArr->recordID[i].page= tempArr->recordID[i-1].page;
       		tempArr->recordID[i].slot= tempArr->recordID[i-1].slot;
 	      	tempArr->next[i]= tempArr->next[i-1];
 				tempArr->lchild[i]= tempArr->lchild[i-1];
-				tempArr->rchild[i]= tempArr->rchild[i-1];			
+				tempArr->rchild[i]= tempArr->rchild[i-1];		
+   			//printf("\n tempArr->Key[i] = tempArr->Key[%d] = <%d>",i,tempArr->Key[i]);
+   			//printf("\n tempArr->Key[i-1] = tempArr->Key[%d] = <%d>",i-1,tempArr->Key[i-1]);					
    	   }	
       		
       	// Add new key and RID value in correct position
 			tempArr->recordID[pos].page = rid.page;
 			tempArr->recordID[pos].slot = rid.slot;
 			tempArr->Key[pos] = key->v.intV;
+   		printf("\n tempArr->Key[pos] = tempArr->Key[%d] = <%d>",pos,tempArr->Key[pos]);
 			tempArr->next[pos] = NULL;
 			tempArr->lchild[pos] = NULL;
 			tempArr->rchild[pos] = NULL;		
@@ -478,24 +484,28 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 			
 			// Add first half to left child
 			for(i = 0; i < midValue; i++)
-			{			
+			{	
+				printf("\n left child - [%d] - tempArr->Key[i] = tempArr->Key[%d] = <%d>",i,tempArr->Key[i]);
 				newLNode->recordID[i].page = tempArr->recordID[i].page;
 				newLNode->recordID[i].slot = tempArr->recordID[i].slot;
 				newLNode->Key[i] = tempArr->Key[i];
 				newLNode->next[i] = tempArr->next[i];
 				newLNode->lchild[i] = tempArr->lchild[i];
 				newLNode->rchild[i] = tempArr->rchild[i];
+				printf("\n left child - [%d] - newLNode->Key[i] = newLNode->Key[%d] = <%d>",i,newLNode->Key[i]);
 			}
 			
 			// Add second half to right child
 			for(j=0,i = midValue; i < (midValue + order) ; j++,i++)
 			{
+				printf("\n right child - [%d] - tempArr->Key[i] = tempArr->Key[%d] = <%d>",i,tempArr->Key[i]);
 				newRNode->recordID[j].page = tempArr->recordID[i].page;
 				newRNode->recordID[j].slot = tempArr->recordID[i].slot;
 				newRNode->Key[j] = tempArr->Key[i];
 				newRNode->next[j] = tempArr->next[i];
 				newRNode->lchild[j] = tempArr->lchild[i];
 				newRNode->rchild[j] = tempArr->rchild[i];
+				printf("\n right child - [%d] - newRNode->Key[j] = newRNode->Key[%d] = <%d>",j,newRNode->Key[j]);
 			}
 
 			// Now as root is split, set new root values
@@ -527,7 +537,12 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 			{
 				if(key->v.intV < temp->Key[i])
 				{
+					printf("\n Going to left child");
 					existingNode=temp->lchild[0];
+					if(temp->lchild[1] != NULL)
+						existingNode=temp->lchild[1];
+					else 
+						existingNode=temp->lchild[0];
 
 					// check if existing node has space or not
 					result = isNodeFull(existingNode);
@@ -581,7 +596,11 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 						temp1->rchild[pos] = NULL;
 						
 						existingNode = temp1;
-						temp->lchild[0] = existingNode;
+						if(temp->lchild[1] != NULL)
+							temp->lchild[1] = existingNode;
+						else 
+							temp->lchild[0] = existingNode;
+							
 						root = temp;
 					}
 					else // split the child node
@@ -591,22 +610,28 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 						newRNode = createNewBTNode(order);			
 						tempArr = createNewBTNode(order*2); // create new array with new key value as well
 						tempArr = existingNode; // set new array the value of node to be split
-
+	
+						printf("\n POSITION IN LEFT CHILD = <%d>",pos);
 						// Move existing data to right side of the array
-	   				for(i = (order-1); i >= pos; i--)
+	   				for(i = (order); i >= pos; i--)
    					{
+   						printf("\n tempArr->Key[i] = tempArr->Key[%d] = <%d>",i,tempArr->Key[i]);
+   						printf("\n tempArr->Key[i-1] = tempArr->Key[%d] = <%d>",i-1,tempArr->Key[i-1]);
 	      				tempArr->Key[i] = tempArr->Key[i-1];
    	   				tempArr->recordID[i].page= tempArr->recordID[i-1].page;
       					tempArr->recordID[i].slot= tempArr->recordID[i-1].slot;
 	      				tempArr->next[i]= tempArr->next[i-1];
 							tempArr->lchild[i]= tempArr->lchild[i-1];
 							tempArr->rchild[i]= tempArr->rchild[i-1];
+   						printf("\n tempArr->Key[i] = tempArr->Key[%d] = <%d>",i,tempArr->Key[i]);
+   						printf("\n tempArr->Key[i-1] = tempArr->Key[%d] = <%d>",i-1,tempArr->Key[i-1]);							
    	   			}	
       		
 			      	// Add new key and RID value in correct position
 						tempArr->recordID[pos].page = rid.page;
 						tempArr->recordID[pos].slot = rid.slot;
 						tempArr->Key[pos] = key->v.intV;
+						printf("\n tempArr->Key[pos] = tempArr->Key[%d] = <%d>",pos,tempArr->Key[pos]);
 						tempArr->next[pos] = NULL;
 						tempArr->lchild[pos] = NULL;
 						tempArr->rchild[pos] = NULL;
@@ -618,23 +643,27 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 						// Add first half to left child
 						for(i = 0; i < midValue; i++)
 						{				
+							printf("\n left - tempArr->Key[i] = tempArr->Key[%d] = <%d>",i,tempArr->Key[i]);
 							newLNode->recordID[i].page = tempArr->recordID[i].page;
 							newLNode->recordID[i].slot = tempArr->recordID[i].slot;
 							newLNode->Key[i] = tempArr->Key[i];
 							newLNode->next[i] = tempArr->next[i];
 							newLNode->lchild[i] = tempArr->lchild[i];
 							newLNode->rchild[i] = tempArr->rchild[i];
+							printf("\n left - newLNode->Key[i] = newLNode->Key[%d] = <%d>",i,newLNode->Key[i]);
 						}
 			
 						// Add second half to right child
 						for(j=0,i = midValue; j < (midValue -1) ; j++,i++)
 						{
+							printf("\n right - tempArr->Key[i] = tempArr->Key[%d] = <%d>",i,tempArr->Key[i]);
 							newRNode->recordID[j].page = tempArr->recordID[i].page;
 							newRNode->recordID[j].slot = tempArr->recordID[i].slot;
 							newRNode->Key[j] = tempArr->Key[i];
 							newRNode->next[j] = tempArr->next[i];
 							newRNode->lchild[j] = tempArr->lchild[i];
 							newRNode->rchild[j] = tempArr->rchild[i];
+							printf("\n left - newLNode->Key[i] = newLNode->Key[%d] = <%d>",j,newLNode->Key[j]);
 						}
 
 						// Now as root is split, set new root values						
@@ -648,6 +677,10 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 						// Now as root is updated, change the next link of left/right children
 						newLNode->next[0] = newRNode;
 						newRNode->next[0] = NULL;		
+						
+						printf("\n newRoot->Key[0] = <%d>",newRoot->Key[0]);
+						printf("\n newRoot->lchild[0] = <%d>",newRoot->lchild[0]);
+						printf("\n newRoot->rchild[0] = <%d>",newRoot->rchild[0]);
 				
 						temp = root;
 						// clubbing both root nodes and realigning the links
@@ -695,7 +728,11 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 				}
 				if((temp->Key[i] < key->v.intV) && (temp->Key[i+1] > key->v.intV))
 				{
-					existingNode=temp->rchild[0];					
+					printf("\n 2. Going to right child");
+					if(temp->rchild[1] != NULL)
+						existingNode=temp->rchild[1];
+					else 
+						existingNode=temp->rchild[0];					
 
 					// check if existing node has space or not
 					result = isNodeFull(existingNode);
@@ -749,7 +786,10 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 						temp1->rchild[pos] = NULL;
 						
 						existingNode = temp1;
-						temp->rchild[0] = existingNode;
+						if(temp->rchild[1] != NULL)
+							temp->rchild[1] = existingNode;
+						else 
+							temp->rchild[0] = existingNode;
 						root = temp;
 					}
 					else // split the child node
@@ -865,6 +905,7 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 					// CHECK NUMBER OF ELEMENTS IN THE NODE.
 					// IF MORE THAN ONE MEANS WE MUST FIND CORRECT CHILD NODE TO INSERT IN		
 					
+					printf("\n 3. Going to left child");
 					if(temp->rchild[1] != NULL)
 						existingNode=temp->rchild[1];
 					else 
@@ -1053,8 +1094,8 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 	totalElements++;
 	
    tree->mgmtData = root;
-	//printTree(tree);
-	//printf("\n----------------------------------\n");
+	printTree(tree);
+	printf("\n----------------------------------\n");
 	return RC_OK;
 }
 
@@ -1078,7 +1119,7 @@ extern RC deleteKey (BTreeHandle *tree, Value *key)
         }
     }
    
-   //totalElements--;
+   totalElements--;
    return RC_OK;
 }
 
