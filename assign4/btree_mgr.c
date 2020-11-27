@@ -58,7 +58,7 @@ bPlusTreeNode *createNewBTNode(int n)
 	newNode->next = malloc(sizeof(bPlusTreeNode) * (n + 1));
     
    //newNode->next = NULL;
-	for (i = 0; i < n + 1; i ++)
+	for (i = 0; i < n + 2; i ++)
 	{
 		newNode->Key[i] = 0;
 		newNode->lchild[i] = NULL;
