@@ -13,7 +13,6 @@ typedef struct BTreeHandle {
   DataType keyType;
   char *idxId;
   void *mgmtData;
-  int recordSize;
 } BTreeHandle;
 
 typedef struct BT_ScanHandle {
