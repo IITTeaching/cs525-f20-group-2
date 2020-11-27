@@ -10,9 +10,9 @@ typedef struct bPlusTreeNode
 } bPlusTreeNode;
 
 DataType typeOfKey;
-int order;
+int order, indexNum = 0;
 static int totalElements, totalLevels;
-bPlusTreeNode *root;
+bPlusTreeNode *root, *scan;
 BTreeHandle *treeHandle;
 SM_FileHandle fileHandle;
 BM_BufferPool *bufferPool;
@@ -175,7 +175,7 @@ extern RC closeBtree (BTreeHandle *tree)
 		shutdownBufferPool(bufferPool);
 		tree->mgmtData=NULL;
 		root = temp = last = tree = NULL;
-
+		//bufferPool = NULL;
 		free(root);
 		free(treeHandle->mgmtData);
 		free(treeHandle);	
@@ -324,7 +324,7 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 
 	//printf("\n INSIDE insertKey ");
 	//tree = treeHandle;
-	printf("\n----------------------------------");
+	//printf("\n----------------------------------");
 	
 	//BM_PageHandle *page = (BM_PageHandle *) malloc(sizeof(BM_PageHandle));
 	
@@ -333,7 +333,6 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 
 	int i, j, pos, setLeftNode, setRightNode, value1, value2, result, splitIndex, midValue;
 	bPlusTreeNode *temp = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
-	//bPlusTreeNode *newNode = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
 	bPlusTreeNode *existingNode, *newLNode, *newRNode, *newRoot, *tempArr, *temp1;
 	
 	i = j = pos = setLeftNode = setRightNode = value1 = value2 = midValue = 0;
@@ -450,7 +449,7 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 			newRoot = createNewBTNode(order);
 			newLNode = createNewBTNode(order);
 			newRNode = createNewBTNode(order);			
-			tempArr = createNewBTNode(order+1); // create new array with new key value as well
+			tempArr = createNewBTNode(order*2); // create new array with new key value as well
 			tempArr = root; // set this new array to root
 
 			// Move existing data to right side of the array
@@ -462,7 +461,7 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
       		tempArr->recordID[i].slot= tempArr->recordID[i-1].slot;
 	      	tempArr->next[i]= tempArr->next[i-1];
 				tempArr->lchild[i]= tempArr->lchild[i-1];
-				tempArr->rchild[i]= tempArr->rchild[i-1];
+				tempArr->rchild[i]= tempArr->rchild[i-1];			
    	   }	
       		
       	// Add new key and RID value in correct position
@@ -471,7 +470,7 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 			tempArr->Key[pos] = key->v.intV;
 			tempArr->next[pos] = NULL;
 			tempArr->lchild[pos] = NULL;
-			tempArr->rchild[pos] = NULL;
+			tempArr->rchild[pos] = NULL;		
 			
 			// split the new temporary array in left and right now based on splitIndex
 
@@ -479,7 +478,7 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 			
 			// Add first half to left child
 			for(i = 0; i < midValue; i++)
-			{				
+			{			
 				newLNode->recordID[i].page = tempArr->recordID[i].page;
 				newLNode->recordID[i].slot = tempArr->recordID[i].slot;
 				newLNode->Key[i] = tempArr->Key[i];
@@ -491,7 +490,6 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 			// Add second half to right child
 			for(j=0,i = midValue; i < (midValue + order) ; j++,i++)
 			{
-				
 				newRNode->recordID[j].page = tempArr->recordID[i].page;
 				newRNode->recordID[j].slot = tempArr->recordID[i].slot;
 				newRNode->Key[j] = tempArr->Key[i];
@@ -515,9 +513,12 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 			// set root to new root
 			root = newRoot;
 			totalLevels++;
-			//free(newRoot);
-			//free(temp);
-			//free(tempArr);	
+			
+			newLNode = newRNode = newRoot = tempArr = NULL;
+			free(newLNode);
+			free(newRNode);
+			free(newRoot);
+			free(tempArr);
 		}
 		else // check if there is place in existing nodes and add value
 		{
@@ -588,7 +589,7 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 						newRoot = createNewBTNode(order);
 						newLNode = createNewBTNode(order);
 						newRNode = createNewBTNode(order);			
-						tempArr = createNewBTNode(order+1); // create new array with new key value as well
+						tempArr = createNewBTNode(order*2); // create new array with new key value as well
 						tempArr = existingNode; // set new array the value of node to be split
 
 						// Move existing data to right side of the array
@@ -687,7 +688,6 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 							temp->rchild[pos-1]->next[0] = newRoot->rchild[0];					
 							
 							root = temp;						
-							//free(temp);
 						}
 					}
 
@@ -856,10 +856,8 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 							temp->rchild[pos-1]->next[0] = newRoot->rchild[0];					
 							
 							root = temp;						
-							//free(temp);
 						}
 					}
-
 		  			break;
 				}
 				if(key->v.intV > temp->Key[order])
@@ -1035,22 +1033,28 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 							temp->rchild[pos-1]->next[0] = newRoot->rchild[0];					
 							
 							root = temp;						
-							//free(temp);
 						}
 					}
-
 		  			break;
 				}
 				
 			}
+			
+			existingNode = newLNode = newRNode = newRoot = tempArr = temp1 = NULL;			
+			free(existingNode);
+			free(newLNode);
+			free(newRNode);
+			free(newRoot);
+			free(tempArr);
+			free(temp1);
 		}
 	}		
 									
 	totalElements++;
-    
+	
    tree->mgmtData = root;
-	printTree(tree);
-	printf("\n----------------------------------\n");
+	//printTree(tree);
+	//printf("\n----------------------------------\n");
 	return RC_OK;
 }
 
@@ -1073,9 +1077,9 @@ extern RC deleteKey (BTreeHandle *tree, Value *key)
             }
         }
     }
-    
-
-    return RC_OK;
+   
+   //totalElements--;
+   return RC_OK;
 }
 
 /* Open B+ tree for scanning */
@@ -1084,7 +1088,93 @@ extern RC openTreeScan (BTreeHandle *tree, BT_ScanHandle **handle)
 	/*
 		1. Helps to scan b+ tree in sort order
 	*/
+	scan = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
+    scan = root;
+    indexNum = 0;
+
+    bPlusTreeNode *temp = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
+    int i;
+    temp = root;
+    
+    printf("\n total elements=%d",totalElements);
+    int Key[totalElements];
+    int elements[order][totalElements];
+    int count = 0;
+
+
+    for (temp = root; temp != NULL; temp = temp->next[0]) {
+        for (i = 0; i < order; i ++) {
+	    printf("\n temp->Key[i]=%d",temp->Key[i]);
+            Key[count] = temp->Key[i];
+            elements[0][count] = temp->recordID[i].page;
+            elements[1][count] = temp->recordID[i].slot;
+            
+	    printf("\n1)-----inside count----");
+		printf("\n Key[%d]=%d",count,Key[count]);
+		printf("\n elements[0][%d]=%d",count,elements[0][count]);
+		printf("\n elements[1][%d]=%d",count,elements[1][count]);
+		count ++;
+        }
+    }
+
+
+    printf("\n count=%d",count);
+    int swap;
+    int pg, st, c, d;
+    for (c = 0 ; c < count - 1; c ++)
+    {
+        for (d = 0 ; d < count - c - 1; d ++)
+        {
+            if (Key[d] > Key[d+1])
+            {
+                swap = Key[d];
+                pg = elements[0][d];
+                st = elements[1][d];          
+
+                Key[d]   = Key[d + 1];
+                elements[0][d] = elements[0][d + 1];
+                elements[1][d] = elements[1][d + 1];
+  
+                Key[d + 1] = swap;
+                elements[0][d + 1] = pg;
+                elements[1][d + 1] = st;
+		printf("\n-----inside if----");
+		printf("\n Key[%d]=%d",d,Key[d]);
+		printf("\n element[0][%d]=%d",d,elements[0][d]);
+		printf("\n element[1][%d]=%d",d,elements[1][d]);
+		printf("\n Key[%d + 1]=%d",d,Key[d + 1]);
+		printf("\n element[0][%d + 1]=%d",d,elements[0][d + 1]);
+		printf("\n element[1][%d + 1]=%d",d,elements[1][d + 1]);
+            }
+		printf("\n-----inside for----");
+		printf("\n Key[%d]=%d",d,Key[d]);
+		printf("\n element[0][%d]=%d",d,elements[0][d]);
+		printf("\n element[1][%d]=%d",d,elements[1][d]);
+		printf("\n Key[%d + 1]=%d",d,Key[d + 1]);
+		printf("\n element[0][%d + 1]=%d",d,elements[0][d + 1]);
+		printf("\n element[1][%d + 1]=%d",d,elements[1][d + 1]);
+        }
+    }
+
+    count = 0;
+
+    for (temp = root; temp != NULL; temp = temp->next[0]) {
+        for (i = 0; i < order; i ++) {
+            temp->Key[i] = Key[count];
+            temp->recordID[i].page = elements[0][count];
+            temp->recordID[i].slot = elements[1][count];
+          
+	printf("\n Key[%d]=%d",i,temp->Key[i]);
+		printf("\n element[0][%d]=%d",i,temp->recordID[i].page);
+		printf("\n element[1][%d]=%d",i,temp->recordID[i].slot);
+count ++;
+        }
+    }
+
+    return RC_OK;
 }
+
+
 
 /* Go to next entry in B+ Tree */
 extern RC nextEntry (BT_ScanHandle *handle, RID *result)
@@ -1093,12 +1183,36 @@ extern RC nextEntry (BT_ScanHandle *handle, RID *result)
 		1. Should return RID of record
 		2. Should return RC_IM_NO_MORE_ENTRIES if no more entries in tree
 	*/
+	//printf("\n scan->next[0]=%d",scan->next[0]);
+	
+	if(scan->next[0] != NULL) {
+	printf("\n scan->next[0]=%d",scan->next[0]);
+	printf("\order=%d",order);
+	printf("\indexNum=%d",indexNum);
+        if(order == indexNum) {
+	    printf("\ninside if");
+            indexNum = 0;
+            scan = scan->next[0];
+        }
 
+        (*result).page = scan->recordID[indexNum].page;
+        (*result).slot = scan->recordID[indexNum].slot;
+	printf("\nscan->id[indexNum].page=%d",scan->recordID[indexNum].page);
+	printf("\nscan->id[indexNum].slot=%d",scan->recordID[indexNum].slot);
+        indexNum ++;
+    }
+    else
+        return RC_IM_NO_MORE_ENTRIES;
+    
+    return RC_OK;
 }
 
 /* Close B+ tree for opened scanning */
 extern RC closeTreeScan (BT_ScanHandle *handle)
 {
+	 indexNum = 0;
+	free(handle);
+    return RC_OK;
 }
 
 /* Print B+ tree for debugging */
