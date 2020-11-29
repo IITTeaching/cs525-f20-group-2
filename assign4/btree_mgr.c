@@ -13,6 +13,7 @@ DataType typeOfKey;
 int order, indexNum = 0;
 static int totalElements, totalLevels;
 bPlusTreeNode *root, *scan;
+bPlusTreeNode *existingNode, *newLNode, *newRNode, *newRoot, *tempArr, *temp1, *temp;
 BTreeHandle *treeHandle;
 SM_FileHandle fileHandle;
 BM_BufferPool *bufferPool;
@@ -153,10 +154,20 @@ extern RC closeBtree (BTreeHandle *tree)
 			printf("\n INSIDE closeBtree - issue with closePageFile");
 			return result;
 		}
+		
+		/*temp = existingNode = newLNode = newRNode = newRoot = tempArr = temp1 = NULL;			
+		free(existingNode);
+		free(newLNode);
+		free(newRNode);
+		free(newRoot);
+		free(tempArr);
+		free(temp1);
+		free(temp);*/
+
 		// for total number of nodes, in for loop free all the keys/next values/RIDs
 		bPlusTreeNode *temp, *last;		
 		temp = tree->mgmtData;
-	
+
 		while(temp!=NULL)
 		{
 			last = temp;
@@ -178,12 +189,13 @@ extern RC closeBtree (BTreeHandle *tree)
 		shutdownBufferPool(bufferPool);
 		tree->mgmtData=NULL;
 		root = temp = last = tree = NULL;
-		//bufferPool = NULL;
+
 		free(root);
 		free(treeHandle->mgmtData);
 		free(treeHandle);	
 		free(tree);
-		//free(bufferPool);
+		free(last);
+		
 		order = totalElements = totalLevels = 0;
 
 	}
@@ -216,9 +228,7 @@ extern RC getNumNodes (BTreeHandle *tree, int *result)
 	*/
 		
 	int totalNodes = 0, i;
-	bPlusTreeNode *temp = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
-	
-	temp = root;
+	bPlusTreeNode *temp = root;
 
 	if(firstTimeLoop == 0)
 	{
@@ -233,6 +243,9 @@ extern RC getNumNodes (BTreeHandle *tree, int *result)
 	}	
 	
 	*result = totalNodes;
+	
+	temp = NULL;
+	free(temp);
 	
 	return RC_OK;
 }
@@ -272,8 +285,7 @@ extern RC findKey (BTreeHandle *tree, Value *key, RID *result)
 	
 	int recordFound, nodeKey, nodeRID;
 	
-	bPlusTreeNode *treeNode = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
-	treeNode = root;
+	bPlusTreeNode *treeNode = root;
 	
 	recordFound = nodeKey = nodeRID = 0;
 
@@ -296,6 +308,8 @@ extern RC findKey (BTreeHandle *tree, Value *key, RID *result)
    if(recordFound == 0)
    {
    	//printf("\n inside findKey - key not found in tree");
+   	treeNode = NULL;
+   	free(treeNode);
    	return RC_IM_KEY_NOT_FOUND;
    }
    	
@@ -309,12 +323,14 @@ extern RC findKey (BTreeHandle *tree, Value *key, RID *result)
 /* Check if node if full or not */
 int isNodeFull (bPlusTreeNode *node)
 {
-	bPlusTreeNode *temp = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
+	bPlusTreeNode *temp = node;
 	for (temp = node; temp != NULL; temp = temp->next[order])
 		for (int i = 0; i < order; i ++) 
 			if (temp->Key[i] == 0)
 				return 1;
 				
+	temp = NULL;
+	free(temp);
 	return 0;	
 }
 
@@ -344,8 +360,8 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 	//bPlusTreeNode *treeNode = (bPlusTreeNode *) tree->mgmtData;
 
 	int i, j, pos, setLeftNode, setRightNode, value1, value2, result, splitIndex, midValue;
-	bPlusTreeNode *temp = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
-	bPlusTreeNode *existingNode, *newLNode, *newRNode, *newRoot, *tempArr, *temp1;
+	//bPlusTreeNode *temp = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
+	//bPlusTreeNode *existingNode, *newLNode, *newRNode, *newRoot, *tempArr, *temp1;
 	
 	i = j = pos = setLeftNode = setRightNode = value1 = value2 = midValue = 0;
 	result = 1;
@@ -422,7 +438,7 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 			}
 		
 			root = temp;
-			//free(temp);
+
 		}
 		
 		if(isNodeFull(root) == 0)
@@ -527,11 +543,6 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 			root = newRoot;
 			totalLevels++;
 			
-			newLNode = newRNode = newRoot = tempArr = NULL;
-			free(newLNode);
-			free(newRNode);
-			free(newRoot);
-			free(tempArr);
 		}
 		else // check if there is place in existing nodes and add value
 		{														
@@ -1212,22 +1223,12 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 						}
 					}
 		  			break;
-				}
-				
+				}	
 			}
-			
-			existingNode = newLNode = newRNode = newRoot = tempArr = temp1 = NULL;			
-			free(existingNode);
-			free(newLNode);
-			free(newRNode);
-			free(newRoot);
-			free(tempArr);
-			free(temp1);
 		}
 	}		
 									
-	totalElements++;
-	
+	totalElements++;				
    tree->mgmtData = root;
 	//printTree(tree);
 	//printf("\n----------------------------------\n");
@@ -1242,7 +1243,7 @@ extern RC deleteKey (BTreeHandle *tree, Value *key)
 		2. Return RC_IM_KEY_NOT_FOUND if key not found in tree
 	*/
 	
-    bPlusTreeNode *temp = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
+    bPlusTreeNode *temp = root;
     int found = 0, i;
     for (temp = root; temp != NULL; temp = temp->next[0]) {
         for (i = 0; i < order; i ++) {
@@ -1255,6 +1256,8 @@ extern RC deleteKey (BTreeHandle *tree, Value *key)
     }
    
    totalElements--;
+   //temp = NULL;
+   free(temp);
    return RC_OK;
 }
 
@@ -1277,6 +1280,8 @@ extern RC openTreeScan (BTreeHandle *tree, BT_ScanHandle **handle)
 	getSorted(temp);
 
 	scan = temp;
+	temp = NULL;
+	free(temp);
 	return RC_OK;
 }
 
@@ -1315,8 +1320,7 @@ extern RC closeTreeScan (BT_ScanHandle *handle)
 /* Print B+ tree for debugging */
 extern char *printTree (BTreeHandle *tree)
 {
-	bPlusTreeNode *node = (bPlusTreeNode *) tree->mgmtData;
-	bPlusTreeNode *temp;
+	bPlusTreeNode *node = root;
 	printf("\nPRINTING TREE:\n");
 
 	if (root == NULL) {
@@ -1324,7 +1328,6 @@ extern char *printTree (BTreeHandle *tree)
 		return RC_IM_EMPTY_TREE;
 	}
 	
-	node = root;
 	while(node!=NULL)
 	{
 		for(int i = 0; i<order; i++)
@@ -1351,6 +1354,8 @@ extern char *printTree (BTreeHandle *tree)
 		printf("\n$$");
 	};
 
+	node = NULL;
+	free(node);
 	return '\0';
 }
 
@@ -1428,4 +1433,7 @@ void getSorted(bPlusTreeNode *temp)
 		}
 		scanCount = 1;
 	}
+	
+	sortTemp = NULL;
+	free(sortTemp);
 }
