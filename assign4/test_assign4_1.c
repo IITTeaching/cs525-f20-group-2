@@ -32,7 +32,7 @@ main (void)
 
   testInsertAndFind();
   testDelete();
-  //testIndexScan();
+  testIndexScan();
 
   return 0;
 }
@@ -222,8 +222,7 @@ testIndexScan (void)
   // init
   TEST_CHECK(initIndexManager(NULL));
 
-  //for(iter = 0; iter < 50; iter++)
-  for(iter = 0; iter < 1; iter++)
+  for(iter = 0; iter < 50; iter++)
     {
       int *permute;
 
@@ -236,17 +235,12 @@ testIndexScan (void)
 
       // insert keys
       for(i = 0; i < numInserts; i++)
-      {
-      	printf("\n [%d][%d] keys[permute[i]] = keys[permute[%d]] = <%d>",iter,i,i,keys[permute[i]]->v.intV);
-			TEST_CHECK(insertKey(tree, keys[permute[i]], insert[permute[i]]));
-		}
+	TEST_CHECK(insertKey(tree, keys[permute[i]], insert[permute[i]]));
 
-		printf("\n");
       // check index stats
       TEST_CHECK(getNumEntries(tree, &testint));
       ASSERT_EQUALS_INT(testint, numInserts, "number of entries in btree");
     
-    /*  
       // execute scan, we should see tuples in sort order
       openTreeScan(tree, &sc);
       i = 0;
@@ -258,7 +252,7 @@ testIndexScan (void)
       ASSERT_EQUALS_INT(RC_IM_NO_MORE_ENTRIES, rc, "no error returned by scan");
       ASSERT_EQUALS_INT(numInserts, i, "have seen all entries");
       closeTreeScan(sc);
-*/
+
       // cleanup
       TEST_CHECK(closeBtree(tree));
       TEST_CHECK(deleteBtree("testidx"));
