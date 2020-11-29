@@ -298,8 +298,11 @@ extern RC findKey (BTreeHandle *tree, Value *key, RID *result)
    	//printf("\n inside findKey - key not found in tree");
    	return RC_IM_KEY_NOT_FOUND;
    }
-        
-	return RC_OK;
+   	
+   treeNode = NULL;
+   free(treeNode);
+	
+   return RC_OK;
 }
 
 
