@@ -13,7 +13,8 @@ DataType typeOfKey;
 int order, indexNum = 0;
 static int totalElements, totalLevels;
 bPlusTreeNode *root, *scan;
-bPlusTreeNode *existingNode, *newLNode, *newRNode, *newRoot, *tempArr, *temp1, *temp;
+//bPlusTreeNode *existingNode, *newLNode, *newRNode, *newRoot, *tempArr, *temp1, *temp;
+bPlusTreeNode *existingNode, *newRNode, *newRoot, *tempArr, *temp1, *temp;
 BTreeHandle *treeHandle;
 SM_FileHandle fileHandle;
 BM_BufferPool *bufferPool;
@@ -363,6 +364,8 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 	//bPlusTreeNode *temp = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
 	//bPlusTreeNode *existingNode, *newLNode, *newRNode, *newRoot, *tempArr, *temp1;
 	
+	bPlusTreeNode *newLNode = (bPlusTreeNode*)malloc(sizeof(bPlusTreeNode));
+	
 	i = j = pos = setLeftNode = setRightNode = value1 = value2 = midValue = 0;
 	result = 1;
  
@@ -542,7 +545,6 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 			// set root to new root
 			root = newRoot;
 			totalLevels++;
-			
 		}
 		else // check if there is place in existing nodes and add value
 		{														
@@ -1226,7 +1228,7 @@ extern RC insertKey (BTreeHandle *tree, Value *key, RID rid)
 				}	
 			}
 		}
-	}		
+	}
 									
 	totalElements++;				
    tree->mgmtData = root;
